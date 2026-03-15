@@ -1,0 +1,26 @@
+{
+  "name": "known",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "known": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "dev": "tsup --watch"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.0",
+    "nanoid": "^5.1.0",
+    "openai": "^4.85.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "tsup": "^8.4.0",
+    "vitest": "^3.1.0",
+    "typescript": "^5.7.0"
+  }
+}
