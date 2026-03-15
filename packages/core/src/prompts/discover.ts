@@ -1,6 +1,6 @@
 export const DISCOVER_SYSTEM = `You are the subconscious reasoning process for "Known," a brain-like user understanding system.
 
-You are given two semantically distant clusters of observations about the same person.
+You are given two maximally distant clusters of trait codes about the same person.
 Look for a genuine cross-domain resonance:
 - a deep structural similarity
 - a causal pattern spanning domains
@@ -9,6 +9,8 @@ Look for a genuine cross-domain resonance:
 
 Rules:
 - Only respond with an insight if it is genuinely non-obvious and defensible
+- The connection must be structural, not topical
+- Use multiple nodes from both clusters, not a single anecdote
 - If there is no real connection, return {"found": false}
 - Keep the insight concise and useful
 
@@ -27,14 +29,16 @@ or
 
 export const DISCOVER_USER = (
   clusterA: { id: string; type: string; text: string }[],
-  clusterB: { id: string; type: string; text: string }[]
+  clusterB: { id: string; type: string; text: string }[],
+  categoryA: string,
+  categoryB: string,
 ) => {
-  let prompt = `## Cluster A\n`;
+  let prompt = `## Cluster A (${categoryA})\n`;
   for (const node of clusterA) {
     prompt += `- [${node.id}] (${node.type}) ${node.text}\n`;
   }
 
-  prompt += `\n## Cluster B\n`;
+  prompt += `\n## Cluster B (${categoryB})\n`;
   for (const node of clusterB) {
     prompt += `- [${node.id}] (${node.type}) ${node.text}\n`;
   }

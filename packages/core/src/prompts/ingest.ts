@@ -1,46 +1,59 @@
-export const INGEST_SYSTEM = `You extract structured observations for "Known," a brain-like user understanding system.
+export const INGEST_SYSTEM = `You extract TRAIT CODES for "Known," a brain-like user understanding system.
 
-Your output has two parts:
-1. nodes: explicit observations about the user and their world
-2. edges: explicit stated relationships between extracted nodes
+Do not extract raw facts, tasks, or requests. Extract what the conversation REVEALS
+about the user at a personality or pattern level.
 
-Node types:
-- person
-- goal
-- project
-- pattern
-- preference
-- event
-- state
+Good targets:
+- decision style
+- communication style
+- stress responses
+- values revealed by tradeoffs
+- recurring avoidance or overcompensation patterns
+- aesthetic tendencies
+- blind spots or self-undermining habits
 
-Allowed edge relations:
-- stated_fact
-- part_of
-- works_at
-- knows
+Bad targets:
+- one-off factual details
+- project names
+- transient asks
+- generic summaries of the session
+
+Return a compact JSON object:
+{
+  "nodes": [
+    {
+      "text": "avoids confrontation when stressed",
+      "type": "stress_response"
+    }
+  ],
+  "edges": []
+}
 
 Rules:
-- Extract only what is explicitly stated or directly observable in the session
-- Do not infer hidden motives, causality, or cross-domain patterns
-- Node text must stand alone without requiring transcript context
-- Prefer fewer, specific observations over many vague ones
-- Only create an edge if both endpoints are present in nodes
-- source_text and target_text must exactly match node text strings
+- Each node text must be a standalone trait code or behavioral pattern
+- Prefer compressed, durable observations over literal paraphrases
+- Provide a short free-form domain tag for each node (for example stress_response or aesthetic_style)
+- Do not use a fixed category taxonomy
+- Only include edges when the conversation itself clearly ties two extracted trait codes together
+- Return valid JSON only`;
+
+export const INGEST_USER = (sessionText: string) =>
+  `Extract trait codes from this session.\n\n${sessionText}`;
+
+export const CONTRADICTION_SYSTEM = `You compare two trait codes about the same user.
+
+Return one label:
+- "same": they express the same underlying pattern in different words
+- "contradict": they point in meaningfully opposite directions
+- "different": they are related or nearby, but not the same pattern and not a contradiction
 
 Return valid JSON only:
 {
-  "nodes": [
-    { "type": "person", "text": "Will leads the frontend team" }
-  ],
-  "edges": [
-    {
-      "source_text": "Will leads the frontend team",
-      "target_text": "Forge UI is a React component library project",
-      "relation": "part_of",
-      "text": "Will works on Forge UI"
-    }
-  ]
+  "relation": "same"
 }`;
 
-export const INGEST_USER = (sessionText: string) =>
-  `Extract explicit observations and explicit relationships from this session.\n\n${sessionText}`;
+export const CONTRADICTION_USER = (existingTrait: string, newTrait: string) =>
+  `Existing trait code: ${existingTrait}
+New trait code: ${newTrait}
+
+Do these describe the same trait, a contradiction, or different nearby patterns?`;

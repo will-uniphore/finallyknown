@@ -1,12 +1,16 @@
 import type { KnownConfig } from "./config.js";
-import type { KnownDB } from "./db.js";
-import { generateEmbeddings } from "./embeddings.js";
+import type { KnownDB, NodeRow } from "./db.js";
+import { generateEmbeddings, semanticSearch } from "./embeddings.js";
 import { getOpenAIClient } from "./openai.js";
-import { INGEST_SYSTEM, INGEST_USER } from "./prompts/ingest.js";
+import { CONTRADICTION_SYSTEM, CONTRADICTION_USER, INGEST_SYSTEM, INGEST_USER } from "./prompts/ingest.js";
+
+const MIN_SESSION_CHARS = 500;
+const DEDUP_SIMILARITY_THRESHOLD = 0.7;
+const MAX_CONTRADICTION_CHECKS = 3;
 
 interface ExtractedNode {
-  type: string;
   text: string;
+  type?: string;
 }
 
 interface ExtractedEdge {
@@ -21,16 +25,35 @@ interface ExtractionResult {
   edges?: ExtractedEdge[];
 }
 
+interface ContradictionResult {
+  relation?: "same" | "contradict" | "different";
+}
+
+function normalizeNodeType(type?: string): string {
+  const normalized = type
+    ?.trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  return normalized || "trait";
+}
+
 function dedupeNodes(nodes: ExtractedNode[]) {
   const deduped = new Map<string, ExtractedNode>();
   for (const node of nodes) {
-    const type = node.type.trim();
     const text = node.text.trim();
-    if (!type || !text) {
+    if (!text) {
       continue;
     }
-    deduped.set(`${type.toLowerCase()}::${text.toLowerCase()}`, { type, text });
+
+    const key = text.toLowerCase();
+    const type = normalizeNodeType(node.type);
+    if (!deduped.has(key)) {
+      deduped.set(key, { text, type });
+    }
   }
+
   return [...deduped.values()];
 }
 
@@ -46,12 +69,122 @@ function parseExtraction(content: string): ExtractionResult {
   }
 }
 
+function hasUserMessages(sessionText: string): boolean {
+  if (/\bUSER\s*:/i.test(sessionText)) {
+    return true;
+  }
+
+  if (/"role"\s*:\s*"user"/i.test(sessionText)) {
+    return true;
+  }
+
+  if (/\bASSISTANT\s*:/i.test(sessionText) || /"role"\s*:\s*"assistant"/i.test(sessionText)) {
+    return false;
+  }
+
+  return true;
+}
+
+async function judgeObservationRelationship(
+  config: KnownConfig,
+  existing: string,
+  candidate: string,
+): Promise<"same" | "contradict" | "different"> {
+  const openai = getOpenAIClient(config);
+  const response = await openai.chat.completions.create({
+    model: config.extractionModel,
+    messages: [
+      { role: "system", content: CONTRADICTION_SYSTEM },
+      { role: "user", content: CONTRADICTION_USER(existing, candidate) },
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0,
+  });
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) {
+    return "different";
+  }
+
+  try {
+    const parsed = JSON.parse(content) as ContradictionResult;
+    return parsed.relation === "same" || parsed.relation === "contradict" ? parsed.relation : "different";
+  } catch {
+    return "different";
+  }
+}
+
+function shouldSkipSession(sessionText: string): boolean {
+  return sessionText.trim().length < MIN_SESSION_CHARS || !hasUserMessages(sessionText);
+}
+
+async function resolveObservationStorage(
+  db: KnownDB,
+  config: KnownConfig,
+  node: ExtractedNode,
+  embedding: Buffer,
+  source: string | null,
+): Promise<{ created: boolean; row: NodeRow }> {
+  const exact = db.findNodeByTypeAndText(normalizeNodeType(node.type), node.text);
+  if (exact) {
+    const row = db.reconfirmNodeObservation(exact.id, {
+      source,
+      embedding,
+      type: exact.type === "trait" ? normalizeNodeType(node.type) : exact.type,
+    });
+
+    return { created: false, row: row ?? exact };
+  }
+
+  const similar = semanticSearch(embedding, db.getNodesWithEmbeddings(), MAX_CONTRADICTION_CHECKS).filter(
+    (candidate) => candidate.similarity >= DEDUP_SIMILARITY_THRESHOLD,
+  );
+
+  let confirmedMatch: NodeRow | undefined;
+
+  for (const candidate of similar) {
+    const relation = await judgeObservationRelationship(config, candidate.text, node.text);
+    if (relation === "same") {
+      confirmedMatch = db.reconfirmNodeObservation(candidate.id, {
+        source,
+        embedding,
+        type: candidate.type === "trait" ? normalizeNodeType(node.type) : candidate.type,
+      });
+      break;
+    }
+
+    if (relation === "contradict") {
+      db.applyContradictionPenalty(candidate.id, 0.7);
+    }
+  }
+
+  if (confirmedMatch) {
+    return { created: false, row: confirmedMatch };
+  }
+
+  const row = db.insertNode({
+    type: normalizeNodeType(node.type),
+    text: node.text.trim(),
+    confidence: 1,
+    source,
+    decay_rate: 0.01,
+    times_observed: 1,
+    embedding,
+  });
+
+  return { created: true, row };
+}
+
 export async function ingest(
   db: KnownDB,
   sessionText: string,
   config: KnownConfig,
-  sessionId?: string
+  sessionId?: string,
 ): Promise<{ nodesCreated: number; edgesCreated: number }> {
+  if (shouldSkipSession(sessionText)) {
+    return { nodesCreated: 0, edgesCreated: 0 };
+  }
+
   const openai = getOpenAIClient(config);
   const response = await openai.chat.completions.create({
     model: config.extractionModel,
@@ -79,15 +212,7 @@ export async function ingest(
   let nodesCreated = 0;
 
   for (const [index, node] of nodes.entries()) {
-    const result = db.upsertNodeObservation({
-      type: node.type,
-      text: node.text,
-      confidence: 1.0,
-      source: sessionId ?? null,
-      decay_rate: 0.01,
-      embedding: embeddings[index] ?? null,
-    });
-
+    const result = await resolveObservationStorage(db, config, node, embeddings[index]!, sessionId ?? null);
     textToNodeId.set(node.text, result.row.id);
     if (result.created) {
       nodesCreated += 1;
@@ -106,7 +231,7 @@ export async function ingest(
 
     const sourceId = textToNodeId.get(sourceText);
     const targetId = textToNodeId.get(targetText);
-    if (!sourceId || !targetId) {
+    if (!sourceId || !targetId || sourceId === targetId) {
       continue;
     }
 

@@ -1,0 +1,88 @@
+{
+  "id": "known",
+  "name": "Known",
+  "description": "Known memory plugin for OpenClaw.",
+  "kind": "memory",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "openaiApiKey": {
+        "type": "string",
+        "description": "Optional OpenAI API key override. Falls back to OPENAI_API_KEY."
+      },
+      "dbPath": {
+        "type": "string",
+        "default": "~/.known/brain.db",
+        "description": "Path to the Known SQLite brain database."
+      },
+      "extractionModel": {
+        "type": "string",
+        "default": "gpt-4o-mini",
+        "description": "Model used for ingest extraction."
+      },
+      "synthesisModel": {
+        "type": "string",
+        "default": "gpt-4o",
+        "description": "Model used for reasoning and discovery."
+      },
+      "discoverIntervalHours": {
+        "type": "number",
+        "default": 4,
+        "minimum": 0,
+        "description": "How often to run background discovery. Set to 0 to disable."
+      },
+      "maintainIntervalHours": {
+        "type": "number",
+        "default": 24,
+        "minimum": 0,
+        "description": "How often to run maintenance. Set to 0 to disable."
+      },
+      "autoIngest": {
+        "type": "boolean",
+        "default": true,
+        "description": "Automatically ingest completed sessions into Known."
+      },
+      "autoContext": {
+        "type": "boolean",
+        "default": true,
+        "description": "Automatically inject relevant Known context before prompt building."
+      }
+    }
+  },
+  "uiHints": {
+    "openaiApiKey": {
+      "label": "OpenAI API Key",
+      "help": "Optional. Falls back to OPENAI_API_KEY.",
+      "sensitive": true,
+      "placeholder": "sk-..."
+    },
+    "dbPath": {
+      "label": "Brain DB Path",
+      "help": "SQLite database path for Known.",
+      "placeholder": "~/.known/brain.db"
+    },
+    "extractionModel": {
+      "label": "Extraction Model",
+      "advanced": true
+    },
+    "synthesisModel": {
+      "label": "Synthesis Model",
+      "advanced": true
+    },
+    "discoverIntervalHours": {
+      "label": "Discover Interval (Hours)",
+      "advanced": true
+    },
+    "maintainIntervalHours": {
+      "label": "Maintain Interval (Hours)",
+      "advanced": true
+    },
+    "autoIngest": {
+      "label": "Auto Ingest"
+    },
+    "autoContext": {
+      "label": "Auto Context"
+    }
+  }
+}

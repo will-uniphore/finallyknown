@@ -1,87 +1,87 @@
 import type { KnownDB, NodeRow } from "./db.js";
-import { cosineSimilarity, bufferToVector } from "./embeddings.js";
+import { bufferToVector, cosineSimilarity } from "./embeddings.js";
 
-/**
- * Pick a random cluster of nodes. Returns a set of related nodes
- * by picking a random node and expanding 1 hop.
- */
-export function randomCluster(db: KnownDB, clusterSize: number = 5): NodeRow[] {
-  const nodes = db.getNodesWithEmbeddings();
-  if (nodes.length === 0) return [];
+export interface ClusterPair {
+  categoryA: string;
+  categoryB: string;
+  clusterA: NodeRow[];
+  clusterB: NodeRow[];
+  distance: number;
+}
 
-  const seed = nodes[Math.floor(Math.random() * nodes.length)];
-  const expanded = db.expandViaEdges([seed.id], 1);
-
-  if (expanded.length >= clusterSize) {
-    return expanded.slice(0, clusterSize);
+function averageEmbedding(nodes: NodeRow[]): Buffer | null {
+  const vectors = nodes.filter((node) => node.embedding).map((node) => bufferToVector(node.embedding!));
+  if (vectors.length === 0) {
+    return null;
   }
 
-  // If not enough via edges, fill with semantically similar nodes
-  if (seed.embedding) {
-    const similar = nodes
-      .filter((n) => n.id !== seed.id && n.embedding)
-      .map((n) => ({ node: n, sim: cosineSimilarity(seed.embedding!, n.embedding!) }))
-      .sort((a, b) => b.sim - a.sim)
-      .slice(0, clusterSize - expanded.length);
-    const expandedIds = new Set(expanded.map((n) => n.id));
-    for (const { node } of similar) {
-      if (!expandedIds.has(node.id)) {
-        expanded.push(node);
+  const dim = vectors[0].length;
+  const avg = new Float32Array(dim);
+  for (const vector of vectors) {
+    for (let i = 0; i < dim; i += 1) {
+      avg[i] += vector[i];
+    }
+  }
+
+  for (let i = 0; i < dim; i += 1) {
+    avg[i] /= vectors.length;
+  }
+
+  return Buffer.from(avg.buffer);
+}
+
+function getCategoryNodes(db: KnownDB, category: string, clusterSize: number): NodeRow[] {
+  return db.getNodesByType(category).slice(0, clusterSize);
+}
+
+export function maximallyDistantClusters(db: KnownDB, clusterSize: number = 5): ClusterPair | null {
+  const categories = db
+    .getDistinctNodeTypes()
+    .map((category) => ({
+      category,
+      nodes: getCategoryNodes(db, category, clusterSize),
+    }))
+    .filter((entry) => entry.nodes.length > 0)
+    .map((entry) => ({
+      ...entry,
+      centroid: averageEmbedding(entry.nodes),
+    }))
+    .filter((entry): entry is { category: string; nodes: NodeRow[]; centroid: Buffer } => entry.centroid !== null);
+
+  if (categories.length < 2) {
+    return null;
+  }
+
+  let bestPair: ClusterPair | null = null;
+
+  for (let i = 0; i < categories.length; i += 1) {
+    for (let j = i + 1; j < categories.length; j += 1) {
+      const left = categories[i];
+      const right = categories[j];
+      const similarity = cosineSimilarity(left.centroid, right.centroid);
+      const distance = 1 - similarity;
+
+      if (!bestPair || distance > bestPair.distance) {
+        bestPair = {
+          categoryA: left.category,
+          categoryB: right.category,
+          clusterA: left.nodes,
+          clusterB: right.nodes,
+          distance,
+        };
       }
     }
   }
 
-  return expanded.slice(0, clusterSize);
+  return bestPair;
 }
 
-/**
- * Pick a cluster that is semantically DISTANT from the given cluster.
- */
-export function distantCluster(
-  db: KnownDB,
-  fromCluster: NodeRow[],
-  clusterSize: number = 5
-): NodeRow[] {
-  const nodes = db.getNodesWithEmbeddings();
-  if (nodes.length === 0) return [];
+export function randomCluster(db: KnownDB, clusterSize: number = 5): NodeRow[] {
+  const pair = maximallyDistantClusters(db, clusterSize);
+  return pair?.clusterA ?? [];
+}
 
-  const fromIds = new Set(fromCluster.map((n) => n.id));
-  const candidates = nodes.filter((n) => !fromIds.has(n.id) && n.embedding);
-
-  if (candidates.length === 0) return [];
-
-  // Compute average embedding of fromCluster
-  const fromEmbeddings = fromCluster.filter((n) => n.embedding).map((n) => bufferToVector(n.embedding!));
-  if (fromEmbeddings.length === 0) return candidates.slice(0, clusterSize);
-
-  const dim = fromEmbeddings[0].length;
-  const avg = new Float32Array(dim);
-  for (const emb of fromEmbeddings) {
-    for (let i = 0; i < dim; i++) avg[i] += emb[i];
-  }
-  for (let i = 0; i < dim; i++) avg[i] /= fromEmbeddings.length;
-  const avgBuf = Buffer.from(avg.buffer);
-
-  // Sort by LOWEST similarity (most distant)
-  const ranked = candidates
-    .map((n) => ({ node: n, sim: cosineSimilarity(avgBuf, n.embedding!) }))
-    .sort((a, b) => a.sim - b.sim);
-
-  // Pick the most distant node, then expand
-  const seed = ranked[0].node;
-  const expanded = db.expandViaEdges([seed.id], 1);
-  const result = expanded.filter((n) => !fromIds.has(n.id));
-
-  if (result.length >= clusterSize) return result.slice(0, clusterSize);
-
-  // Fill with other distant nodes
-  const resultIds = new Set(result.map((n) => n.id));
-  for (const { node } of ranked) {
-    if (!resultIds.has(node.id) && !fromIds.has(node.id)) {
-      result.push(node);
-      if (result.length >= clusterSize) break;
-    }
-  }
-
-  return result.slice(0, clusterSize);
+export function distantCluster(db: KnownDB, _fromCluster: NodeRow[], clusterSize: number = 5): NodeRow[] {
+  const pair = maximallyDistantClusters(db, clusterSize);
+  return pair?.clusterB ?? [];
 }

@@ -16,6 +16,6 @@ export function getConfig(overrides?: Partial<KnownConfig>): KnownConfig {
     dbPath: overrides?.dbPath ?? process.env.KNOWN_DB_PATH ?? join(knownDir, "brain.db"),
     embeddingModel: overrides?.embeddingModel ?? "text-embedding-3-small",
     extractionModel: overrides?.extractionModel ?? "gpt-4o-mini",
-    synthesisModel: overrides?.synthesisModel ?? "gpt-4o",
+    synthesisModel: overrides?.synthesisModel ?? "gpt-4o-mini",
   };
 }

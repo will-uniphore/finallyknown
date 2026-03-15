@@ -1,11 +1,15 @@
 import type { KnownConfig } from "./config.js";
-import type { KnownDB } from "./db.js";
+import type { InsightRow, KnownDB } from "./db.js";
 import { generateEmbedding, semanticSearch } from "./embeddings.js";
 
 export interface StoreOrStrengthenInsightResult {
   created: boolean;
   strengthened: boolean;
   insightId: string;
+}
+
+export function shouldSurfaceInsight(insight: Pick<InsightRow, "times_rediscovered" | "confidence">): boolean {
+  return insight.times_rediscovered >= 2 && insight.confidence >= 0.6;
 }
 
 export async function storeOrStrengthenInsight(
@@ -27,7 +31,7 @@ export async function storeOrStrengthenInsight(
   const row = db.insertInsight({
     text,
     supporting_nodes: JSON.stringify([...new Set(supportingNodeIds)]),
-    confidence: 0.7,
+    confidence: 0.4,
     embedding,
   });
 

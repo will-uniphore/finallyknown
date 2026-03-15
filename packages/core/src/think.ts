@@ -1,9 +1,11 @@
 import type { KnownConfig } from "./config.js";
-import type { EdgeRow, KnownDB } from "./db.js";
+import type { EdgeRow, KnownDB, NodeRow } from "./db.js";
 import { generateEmbedding, semanticSearch } from "./embeddings.js";
-import { storeOrStrengthenInsight } from "./insights.js";
+import { shouldSurfaceInsight, storeOrStrengthenInsight } from "./insights.js";
 import { getOpenAIClient } from "./openai.js";
 import { THINK_SYSTEM, THINK_USER } from "./prompts/think.js";
+
+const ACTIVATION_DECAY_PER_HOP = 0.5;
 
 interface ThinkLLMResult {
   response: string;
@@ -17,6 +19,12 @@ interface ThinkResult {
   response: string;
   insightsUsed: number;
   newInsights: number;
+}
+
+interface ActivatedNode {
+  node: NodeRow;
+  similarity: number;
+  activation: number;
 }
 
 function formatEdges(edges: EdgeRow[]) {
@@ -41,42 +49,69 @@ function parseThinkResult(content: string): ThinkLLMResult {
   }
 }
 
+function activateNodes(db: KnownDB, seeds: Array<NodeRow & { similarity: number }>): ActivatedNode[] {
+  const activationMap = new Map<string, ActivatedNode>();
+
+  for (const seed of seeds) {
+    const seedActivation = seed.similarity * seed.confidence;
+    activationMap.set(seed.id, {
+      node: seed,
+      similarity: seed.similarity,
+      activation: seedActivation,
+    });
+
+    for (const edge of db.getEdgesForNode(seed.id)) {
+      const neighborId = edge.source_id === seed.id ? edge.target_id : edge.source_id;
+      const neighbor = db.getNode(neighborId);
+      if (!neighbor || neighbor.confidence <= 0.1) {
+        continue;
+      }
+
+      const spreadActivation = seedActivation * ACTIVATION_DECAY_PER_HOP * edge.confidence;
+      const existing = activationMap.get(neighbor.id);
+      activationMap.set(neighbor.id, {
+        node: neighbor,
+        similarity: existing?.similarity ?? 0,
+        activation: (existing?.activation ?? 0) + spreadActivation,
+      });
+    }
+  }
+
+  return [...activationMap.values()].sort((left, right) => right.activation - left.activation);
+}
+
 export async function think(
   db: KnownDB,
   question: string,
   config: KnownConfig,
-  agentContext?: string
+  agentContext?: string,
 ): Promise<ThinkResult> {
   const openai = getOpenAIClient(config);
   const queryEmbedding = await generateEmbedding(question, config);
 
   const relevantNodes = semanticSearch(queryEmbedding, db.getNodesWithEmbeddings(), 20);
-  const relevantInsights = semanticSearch(queryEmbedding, db.getInsightsWithEmbeddings(), 5);
-  const expandedNodes = db.expandViaEdges(
-    relevantNodes.map((node) => node.id),
-    2
-  );
+  const activatedNodes = activateNodes(db, relevantNodes).slice(0, 25);
+  const surfacedInsights = semanticSearch(queryEmbedding, db.getInsightsWithEmbeddings(), 10)
+    .filter((insight) => shouldSurfaceInsight(insight))
+    .slice(0, 5);
 
-  const nodeMap = new Map<string, (typeof relevantNodes)[number]>();
-  for (const node of relevantNodes) {
-    nodeMap.set(node.id, node);
-  }
-  for (const node of expandedNodes) {
-    if (!nodeMap.has(node.id)) {
-      nodeMap.set(node.id, { ...node, similarity: 0 });
-    }
+  const nodeMap = new Map<string, ActivatedNode>();
+  for (const entry of activatedNodes) {
+    nodeMap.set(entry.node.id, entry);
   }
 
-  const nodesForPrompt = [...nodeMap.values()].map((node) => ({
+  const nodesForPrompt = [...nodeMap.values()].map(({ node, similarity, activation }) => ({
     id: node.id,
     type: node.type,
     text: node.text,
     confidence: node.confidence,
-    similarity: node.similarity,
+    similarity,
+    activation,
+    times_observed: node.times_observed,
   }));
 
   const edgesForPrompt = formatEdges(db.getEdgesBetweenNodes(nodesForPrompt.map((node) => node.id)));
-  const insightsForPrompt = relevantInsights.map((insight) => ({
+  const insightsForPrompt = surfacedInsights.map((insight) => ({
     id: insight.id,
     text: insight.text,
     confidence: insight.confidence,
@@ -94,7 +129,7 @@ export async function think(
       },
     ],
     response_format: { type: "json_object" },
-    temperature: 0.7,
+    temperature: 0.4,
   });
 
   const content = response.choices[0]?.message?.content;
@@ -104,7 +139,7 @@ export async function think(
 
   const result = parseThinkResult(content);
 
-  for (const insight of relevantInsights) {
+  for (const insight of surfacedInsights) {
     db.markInsightUsed(insight.id);
   }
 
@@ -116,7 +151,7 @@ export async function think(
     }
 
     const supportingNodeIds = connection.supporting_node_ids?.filter((nodeId) => nodeMap.has(nodeId)) ?? [];
-    const stored = await storeOrStrengthenInsight(db, config, text, supportingNodeIds, 0.9);
+    const stored = await storeOrStrengthenInsight(db, config, text, supportingNodeIds, 0.85);
     if (stored.created) {
       newInsights += 1;
     }
@@ -124,7 +159,7 @@ export async function think(
 
   return {
     response: result.response || "Unable to reason about this question.",
-    insightsUsed: relevantInsights.length,
+    insightsUsed: surfacedInsights.length,
     newInsights,
   };
 }

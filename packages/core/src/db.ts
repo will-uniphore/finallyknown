@@ -1,7 +1,9 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "fs";
-import { dirname } from "path";
 import { nanoid } from "nanoid";
+import { dirname } from "path";
+
+const DAY_MS = 1000 * 60 * 60 * 24;
 
 export interface NodeRow {
   id: string;
@@ -12,6 +14,7 @@ export interface NodeRow {
   created_at: string;
   updated_at: string;
   decay_rate: number;
+  times_observed: number;
   embedding: Buffer | null;
 }
 
@@ -40,15 +43,16 @@ export interface InsightRow {
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS nodes (
-    id          TEXT PRIMARY KEY,
-    type        TEXT NOT NULL,
-    text        TEXT NOT NULL,
-    confidence  REAL DEFAULT 1.0,
-    source      TEXT,
-    created_at  TEXT NOT NULL,
-    updated_at  TEXT NOT NULL,
-    decay_rate  REAL DEFAULT 0.01,
-    embedding   BLOB
+    id              TEXT PRIMARY KEY,
+    type            TEXT NOT NULL,
+    text            TEXT NOT NULL,
+    confidence      REAL DEFAULT 1.0,
+    source          TEXT,
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL,
+    decay_rate      REAL DEFAULT 0.01,
+    times_observed  REAL DEFAULT 1,
+    embedding       BLOB
 );
 
 CREATE TABLE IF NOT EXISTS edges (
@@ -66,7 +70,7 @@ CREATE TABLE IF NOT EXISTS insights (
     id                  TEXT PRIMARY KEY,
     text                TEXT NOT NULL,
     supporting_nodes    TEXT NOT NULL,
-    confidence          REAL DEFAULT 0.7,
+    confidence          REAL DEFAULT 0.4,
     discovered_at       TEXT NOT NULL,
     times_rediscovered  INTEGER DEFAULT 0,
     times_used          INTEGER DEFAULT 0,
@@ -85,6 +89,27 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+export function daysSince(timestamp: string, now: Date = new Date()): number {
+  const parsed = new Date(timestamp);
+  if (Number.isNaN(parsed.getTime())) {
+    return 0;
+  }
+
+  return Math.max(0, (now.getTime() - parsed.getTime()) / DAY_MS);
+}
+
+export function computeObservationConfidence(timesObserved: number, lastSeenAt: string, now: Date = new Date()): number {
+  const observed = Math.max(timesObserved, 0.01);
+  const elapsedDays = daysSince(lastSeenAt, now);
+  return Math.max(0, Math.min(1, observed / (observed + elapsedDays)));
+}
+
+function observationCountForConfidence(confidence: number, elapsedDays: number): number {
+  const clampedConfidence = Math.max(0.01, Math.min(0.99, confidence));
+  const safeDays = Math.max(elapsedDays, 1);
+  return (clampedConfidence * safeDays) / (1 - clampedConfidence);
+}
+
 function parseSupportingNodes(raw: string): string[] {
   try {
     const parsed = JSON.parse(raw);
@@ -101,6 +126,11 @@ function stringifySupportingNodes(nodeIds: string[]) {
   return JSON.stringify([...new Set(nodeIds)]);
 }
 
+function hasColumn(db: Database.Database, table: string, column: string): boolean {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  return columns.some((entry) => entry.name === column);
+}
+
 export class KnownDB {
   db: Database.Database;
 
@@ -110,6 +140,15 @@ export class KnownDB {
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("foreign_keys = ON");
     this.db.exec(SCHEMA);
+    this.migrate();
+  }
+
+  private migrate() {
+    if (!hasColumn(this.db, "nodes", "times_observed")) {
+      this.db.prepare("ALTER TABLE nodes ADD COLUMN times_observed REAL DEFAULT 1").run();
+    }
+
+    this.db.prepare("UPDATE nodes SET times_observed = COALESCE(times_observed, 1)").run();
   }
 
   close() {
@@ -120,38 +159,106 @@ export class KnownDB {
 
   insertNode(node: Omit<NodeRow, "id" | "created_at" | "updated_at"> & { id?: string }): NodeRow {
     const now = nowIso();
+    const timesObserved = Math.max(node.times_observed ?? 1, 0.01);
     const row: NodeRow = {
       id: node.id ?? nanoid(),
       type: node.type,
       text: node.text,
-      confidence: node.confidence ?? 1.0,
+      confidence: node.confidence ?? computeObservationConfidence(timesObserved, now),
       source: node.source ?? null,
       created_at: now,
       updated_at: now,
       decay_rate: node.decay_rate ?? 0.01,
+      times_observed: timesObserved,
       embedding: node.embedding ?? null,
     };
 
     this.db
       .prepare(
-        `INSERT INTO nodes (id, type, text, confidence, source, created_at, updated_at, decay_rate, embedding)
-         VALUES (@id, @type, @text, @confidence, @source, @created_at, @updated_at, @decay_rate, @embedding)`
+        `INSERT INTO nodes (id, type, text, confidence, source, created_at, updated_at, decay_rate, times_observed, embedding)
+         VALUES (@id, @type, @text, @confidence, @source, @created_at, @updated_at, @decay_rate, @times_observed, @embedding)`,
       )
       .run(row);
 
     return row;
   }
 
-  findNodeByTypeAndText(type: string, text: string): NodeRow | undefined {
+  findNodeByTypeAndText(_type: string, text: string): NodeRow | undefined {
     return this.db
       .prepare(
         `SELECT * FROM nodes
-         WHERE type = ?
-           AND LOWER(TRIM(text)) = LOWER(TRIM(?))
+         WHERE LOWER(TRIM(text)) = LOWER(TRIM(?))
          ORDER BY confidence DESC, updated_at DESC
-         LIMIT 1`
+         LIMIT 1`,
       )
-      .get(type, text) as NodeRow | undefined;
+      .get(text) as NodeRow | undefined;
+  }
+
+  reconfirmNodeObservation(
+    id: string,
+    updates?: {
+      source?: string | null;
+      embedding?: Buffer | null;
+      type?: string;
+      text?: string;
+    },
+  ): NodeRow | undefined {
+    const existing = this.getNode(id);
+    if (!existing) {
+      return undefined;
+    }
+
+    const updatedAt = nowIso();
+    const timesObserved = Math.max(existing.times_observed + 1, 0.01);
+    const confidence = computeObservationConfidence(timesObserved, updatedAt);
+
+    this.db
+      .prepare(
+        `UPDATE nodes
+         SET confidence = ?,
+             source = ?,
+             updated_at = ?,
+             embedding = ?,
+             type = ?,
+             text = ?,
+             times_observed = ?
+         WHERE id = ?`,
+      )
+      .run(
+        confidence,
+        updates?.source ?? existing.source,
+        updatedAt,
+        updates?.embedding ?? existing.embedding,
+        updates?.type ?? existing.type,
+        updates?.text ?? existing.text,
+        timesObserved,
+        existing.id,
+      );
+
+    return this.getNode(existing.id);
+  }
+
+  applyContradictionPenalty(id: string, factor: number = 0.7): NodeRow | undefined {
+    const existing = this.getNode(id);
+    if (!existing) {
+      return undefined;
+    }
+
+    const currentConfidence = computeObservationConfidence(existing.times_observed, existing.updated_at);
+    const targetConfidence = Math.max(0.01, currentConfidence * factor);
+    const elapsedDays = Math.max(daysSince(existing.updated_at), 1);
+    const timesObserved = observationCountForConfidence(targetConfidence, elapsedDays);
+
+    this.db
+      .prepare(
+        `UPDATE nodes
+         SET confidence = ?,
+             times_observed = ?
+         WHERE id = ?`,
+      )
+      .run(targetConfidence, timesObserved, existing.id);
+
+    return this.getNode(existing.id);
   }
 
   upsertNodeObservation(node: Omit<NodeRow, "id" | "created_at" | "updated_at"> & { id?: string }): {
@@ -164,33 +271,15 @@ export class KnownDB {
       return { created: true, row: this.insertNode(node) };
     }
 
-    const confidence = Math.max(existing.confidence, node.confidence ?? 1.0);
-    const source = node.source ?? existing.source;
-    const embedding = node.embedding ?? existing.embedding;
-    const updatedAt = nowIso();
+    const row =
+      this.reconfirmNodeObservation(existing.id, {
+        source: node.source ?? existing.source,
+        embedding: node.embedding ?? existing.embedding,
+        type: node.type || existing.type,
+        text: existing.text,
+      }) ?? existing;
 
-    this.db
-      .prepare(
-        `UPDATE nodes
-         SET confidence = ?,
-             source = ?,
-             updated_at = ?,
-             decay_rate = ?,
-             embedding = ?,
-             text = ?
-         WHERE id = ?`
-      )
-      .run(
-        confidence,
-        source,
-        updatedAt,
-        node.decay_rate ?? existing.decay_rate,
-        embedding,
-        node.text,
-        existing.id
-      );
-
-    return { created: false, row: this.getNode(existing.id)! };
+    return { created: false, row };
   }
 
   updateNodeEmbedding(id: string, embedding: Buffer) {
@@ -198,7 +287,7 @@ export class KnownDB {
   }
 
   updateNodeConfidence(id: string, confidence: number) {
-    this.db.prepare("UPDATE nodes SET confidence = ?, updated_at = ? WHERE id = ?").run(confidence, nowIso(), id);
+    this.db.prepare("UPDATE nodes SET confidence = ? WHERE id = ?").run(confidence, id);
   }
 
   touchNode(id: string) {
@@ -211,6 +300,32 @@ export class KnownDB {
 
   getAllNodes(): NodeRow[] {
     return this.db.prepare("SELECT * FROM nodes").all() as NodeRow[];
+  }
+
+  getNodesByType(type: string): NodeRow[] {
+    return this.db
+      .prepare(
+        `SELECT * FROM nodes
+         WHERE type = ?
+           AND embedding IS NOT NULL
+           AND confidence > 0.1
+         ORDER BY confidence DESC, times_observed DESC`,
+      )
+      .all(type) as NodeRow[];
+  }
+
+  getDistinctNodeTypes(): string[] {
+    return (
+      this.db
+        .prepare(
+          `SELECT DISTINCT type
+           FROM nodes
+           WHERE embedding IS NOT NULL
+             AND confidence > 0.1
+             AND TRIM(type) <> ''`,
+        )
+        .all() as Array<{ type: string }>
+    ).map((row) => row.type);
   }
 
   getNodesWithEmbeddings(): NodeRow[] {
@@ -280,7 +395,7 @@ export class KnownDB {
     this.db
       .prepare(
         `INSERT INTO edges (id, source_id, target_id, relation, text, confidence, source, created_at)
-         VALUES (@id, @source_id, @target_id, @relation, @text, @confidence, @source, @created_at)`
+         VALUES (@id, @source_id, @target_id, @relation, @text, @confidence, @source, @created_at)`,
       )
       .run(row);
 
@@ -294,7 +409,7 @@ export class KnownDB {
          WHERE source_id = ?
            AND target_id = ?
            AND relation = ?
-         LIMIT 1`
+         LIMIT 1`,
       )
       .get(sourceId, targetId, relation) as EdgeRow | undefined;
   }
@@ -312,7 +427,7 @@ export class KnownDB {
          SET confidence = ?,
              source = ?,
              text = COALESCE(?, text)
-         WHERE id = ?`
+         WHERE id = ?`,
       )
       .run(Math.max(existing.confidence, edge.confidence ?? 1.0), edge.source ?? existing.source, edge.text ?? existing.text, existing.id);
 
@@ -345,7 +460,7 @@ export class KnownDB {
       .prepare(
         `SELECT * FROM edges
          WHERE source_id IN (${placeholders})
-           AND target_id IN (${placeholders})`
+           AND target_id IN (${placeholders})`,
       )
       .all(...nodeIds, ...nodeIds) as EdgeRow[];
   }
@@ -406,13 +521,13 @@ export class KnownDB {
   insertInsight(
     insight: Omit<InsightRow, "id" | "discovered_at" | "times_rediscovered" | "times_used" | "last_used"> & {
       id?: string;
-    }
+    },
   ): InsightRow {
     const row: InsightRow = {
       id: insight.id ?? nanoid(),
       text: insight.text,
       supporting_nodes: insight.supporting_nodes,
-      confidence: insight.confidence ?? 0.7,
+      confidence: insight.confidence ?? 0.4,
       discovered_at: nowIso(),
       times_rediscovered: 0,
       times_used: 0,
@@ -423,7 +538,7 @@ export class KnownDB {
     this.db
       .prepare(
         `INSERT INTO insights (id, text, supporting_nodes, confidence, discovered_at, times_rediscovered, times_used, last_used, embedding)
-         VALUES (@id, @text, @supporting_nodes, @confidence, @discovered_at, @times_rediscovered, @times_used, @last_used, @embedding)`
+         VALUES (@id, @text, @supporting_nodes, @confidence, @discovered_at, @times_rediscovered, @times_used, @last_used, @embedding)`,
       )
       .run(row);
 
@@ -455,7 +570,7 @@ export class KnownDB {
         `UPDATE insights
          SET times_rediscovered = times_rediscovered + 1,
              confidence = MIN(1.0, confidence + 0.1)
-         WHERE id = ?`
+         WHERE id = ?`,
       )
       .run(id);
   }
@@ -467,7 +582,7 @@ export class KnownDB {
          SET times_used = times_used + 1,
              last_used = ?,
              confidence = MIN(1.0, confidence + 0.05)
-         WHERE id = ?`
+         WHERE id = ?`,
       )
       .run(nowIso(), id);
   }
@@ -499,7 +614,7 @@ export class KnownDB {
 
   // --- Graph Traversal ---
 
-  expandViaEdges(nodeIds: string[], depth: number = 2): NodeRow[] {
+  expandViaEdges(nodeIds: string[], depth: number = 1): NodeRow[] {
     if (nodeIds.length === 0) {
       return [];
     }
@@ -517,7 +632,7 @@ export class KnownDB {
         )
         SELECT DISTINCT n.* FROM nodes n
         JOIN reachable r ON n.id = r.id
-        WHERE n.confidence > 0.1`
+        WHERE n.confidence > 0.1`,
       )
       .all(...nodeIds, depth) as NodeRow[];
   }
