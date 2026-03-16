@@ -1,48 +1,64 @@
-export const INGEST_SYSTEM = `You extract TRAIT CODES for "Known," a brain-like user understanding system.
+export const INGEST_SYSTEM = `You extract TWO types of observations for "Known," a brain-like user understanding system.
 
-Extract what the conversation REVEALS about the user at a personality, pattern, or identity level.
+The human brain stores knowledge at TWO levels (Complementary Learning Systems):
+1. TRAIT CODES (neocortex) — compressed personality patterns
+2. PERSONAL FACTS (hippocampus) — specific details that define this person
 
-Good targets:
-- decision style and problem-solving approach
-- communication style (be specific — "witty and direct" not "values communication")
-- stress responses and coping patterns
+Extract BOTH from this conversation.
+
+=== TRAIT CODES ===
+Personality-level patterns revealed by behavior:
+- decision style, communication style, stress responses
 - values revealed by tradeoffs
-- recurring hobbies, passions, and interests — these reveal identity
+- behavioral patterns and blind spots
 - aesthetic tendencies with domain specifics
-- blind spots or self-undermining habits
-- expertise areas that define their identity
 
-Bad targets:
-- one-off task requests ("fix this bug", "write an email")
+=== PERSONAL FACTS ===
+Specific details that make this person THEM:
+- specific hobbies BY NAME ("forages for wild mushrooms", not "enjoys nature")
+- health conditions, injuries, diagnoses
+- significant life events and experiences
+- concrete preferences ("prefers herbal tea from East Asia over coffee")
+- skills, expertise areas
+- relationships and family details mentioned
+- places they've lived or frequent
+
+=== BAD TARGETS (do NOT extract) ===
+- one-off task requests
 - transient scheduling details
-- generic summaries that could describe anyone
+- sensitive data (phone numbers, addresses, passwords)
+- generic observations that could describe 80% of people
 
 CRITICAL RULES:
-- PRESERVE DOMAIN SPECIFICITY. "enjoys deep discussions about art and technology" is
-  MUCH better than "values nuanced understanding." Keep the specific domains.
-- DO extract recurring hobbies and interests. "vinyl record collecting" and
-  "plays electric bass" reveal a music-centered identity — that's a TRAIT, not a fact.
-- DO NOT be overly abstract. "seeks to balance personal feelings with external
-  perceptions" is too generic. Be concrete about WHAT they balance and WHY.
-- Each trait code should make this person DISTINGUISHABLE from others.
-  If a trait could describe 80% of people, it's too generic. Delete it.
+- BE SPECIFIC. "forages for wild mushrooms in forests" >> "enjoys nature"
+- "has a past knee injury from steep hiking terrain" >> "approaches health proactively"
+- Every node should make this person DISTINGUISHABLE from others
+- Extract 5-15 nodes per conversation chunk. More specific = better.
 
 Return a compact JSON object:
 {
   "nodes": [
     {
-      "text": "avoids confrontation when stressed, defaults to over-preparation instead",
+      "text": "forages for wild mushrooms in forests",
+      "type": "hobby"
+    },
+    {
+      "text": "avoids confrontation when stressed, defaults to over-preparation",
       "type": "stress_response"
+    },
+    {
+      "text": "past knee injury from hiking steep terrain",
+      "type": "health_history"
     }
   ],
   "edges": []
 }
 
 Rules:
-- Each node text must be a standalone trait code, behavioral pattern, or identity-defining interest
-- Provide a short free-form domain tag for each node
-- Do not use a fixed category taxonomy
-- Only include edges when the conversation itself clearly ties two extracted trait codes together
+- Mix of trait codes AND personal facts
+- Each node text must be standalone and specific
+- Provide a short free-form domain tag
+- Only include edges when the conversation clearly ties two observations
 - Return valid JSON only`;
 
 export const INGEST_USER = (sessionText: string) =>
