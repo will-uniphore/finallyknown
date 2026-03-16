@@ -134,7 +134,7 @@ const PANDORA_JSON_PATH = "/tmp/known-test-data/extracted/pandora-test.json";
 const TEST_IDS: BenchmarkTestId[] = ["1a", "2a", "3a", "4a"];
 const QA_JUDGE_BATCH_SIZE = 10;
 const BIG_FIVE_QUERY =
-  'Rate this person on the Big Five traits from 0 to 100. Return ONLY minified JSON with numeric keys "openness", "conscientiousness", "extraversion", "agreeableness", and "neuroticism".';
+  'Rate this person on Big Five personality traits from 0-100. Include scores as: openness: X, conscientiousness: X, extraversion: X, agreeableness: X, neuroticism: X';
 
 function usage() {
   console.log(`Usage:
@@ -401,7 +401,33 @@ function parseSupportingNodeIds(raw: string) {
 }
 
 function parseBigFiveResponse(text: string): BigFiveScores | null {
-  const parsed = parseJsonObject<Record<string, unknown>>(text);
+  // Try parsing the full text as JSON first
+  let parsed = parseJsonObject<Record<string, unknown>>(text);
+  
+  // If that fails, try to extract JSON from within the text (think() returns natural language)
+  if (!parsed) {
+    const jsonMatch = text.match(/\{[^{}]*"openness"[^{}]*\}/);
+    if (jsonMatch) {
+      parsed = parseJsonObject<Record<string, unknown>>(jsonMatch[0]);
+    }
+  }
+  
+  // Last resort: extract numbers after trait names
+  if (!parsed) {
+    const extract = (trait: string): number => {
+      const re = new RegExp(`${trait}[^0-9]*?(\\d+)`, 'i');
+      const m = text.match(re);
+      return m ? Number.parseInt(m[1], 10) : Number.NaN;
+    };
+    parsed = {
+      openness: extract('openness'),
+      conscientiousness: extract('conscientiousness'),
+      extraversion: extract('extraversion'),
+      agreeableness: extract('agreeableness'),
+      neuroticism: extract('neuroticism'),
+    };
+  }
+
   if (!parsed) {
     return null;
   }

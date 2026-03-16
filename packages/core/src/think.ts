@@ -89,7 +89,11 @@ export async function think(
   const openai = getOpenAIClient(config);
   const queryEmbedding = await generateEmbedding(question, config);
 
-  const relevantNodes = semanticSearch(queryEmbedding, db.getNodesWithEmbeddings(), 20);
+  const allNodesWithEmb = db.getNodesWithEmbeddings();
+  // If graph is small, use ALL nodes (no semantic filtering needed)
+  const relevantNodes = allNodesWithEmb.length <= 30
+    ? allNodesWithEmb.map(n => ({ ...n, similarity: 1.0 }))
+    : semanticSearch(queryEmbedding, allNodesWithEmb, 20);
   const activatedNodes = activateNodes(db, relevantNodes).slice(0, 25);
   const surfacedInsights = semanticSearch(queryEmbedding, db.getInsightsWithEmbeddings(), 10)
     .filter((insight) => shouldSurfaceInsight(insight))
