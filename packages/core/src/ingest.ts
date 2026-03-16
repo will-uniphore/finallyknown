@@ -175,6 +175,17 @@ async function resolveObservationStorage(
   return { created: true, row };
 }
 
+const MAX_CHUNK_CHARS = 30000; // ~22K tokens — safe for mini's 128K window with prompt overhead
+
+function chunkText(text: string, maxChars: number): string[] {
+  if (text.length <= maxChars) return [text];
+  const chunks: string[] = [];
+  for (let i = 0; i < text.length; i += maxChars) {
+    chunks.push(text.slice(i, i + maxChars));
+  }
+  return chunks;
+}
+
 export async function ingest(
   db: KnownDB,
   sessionText: string,
@@ -185,6 +196,26 @@ export async function ingest(
     return { nodesCreated: 0, edgesCreated: 0 };
   }
 
+  // Chunk long sessions to stay within context window
+  const chunks = chunkText(sessionText, MAX_CHUNK_CHARS);
+  let totalNodesCreated = 0;
+  let totalEdgesCreated = 0;
+
+  for (const chunk of chunks) {
+    const result = await ingestChunk(db, chunk, config, sessionId);
+    totalNodesCreated += result.nodesCreated;
+    totalEdgesCreated += result.edgesCreated;
+  }
+
+  return { nodesCreated: totalNodesCreated, edgesCreated: totalEdgesCreated };
+}
+
+async function ingestChunk(
+  db: KnownDB,
+  sessionText: string,
+  config: KnownConfig,
+  sessionId?: string,
+): Promise<{ nodesCreated: number; edgesCreated: number }> {
   const openai = getOpenAIClient(config);
   const response = await openai.chat.completions.create({
     model: config.extractionModel,
