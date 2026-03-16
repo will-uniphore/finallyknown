@@ -6,6 +6,7 @@ import { KnownDB } from "./db.js";
 import { discover } from "./discover.js";
 import { ingest } from "./ingest.js";
 import { maintain } from "./maintain.js";
+import { runBenchmarkCli } from "./tests/benchmark.js";
 import { think } from "./think.js";
 
 function usage() {
@@ -17,6 +18,7 @@ function usage() {
   known query "<question>" [--context "<agent context>"]
   known discover
   known maintain
+  known benchmark [--test 1a|2a|3a|4a|all] [--personas 5] [--pandora-users 20]
   known stats`);
 }
 
@@ -51,11 +53,12 @@ async function main() {
   }
 
   const config = getConfig();
-  const db = new KnownDB(config.dbPath);
+  let db: KnownDB | null = null;
 
   try {
     switch (command) {
       case "ingest": {
+        db = new KnownDB(config.dbPath);
         const sessionFlag = parseFlag(rawArgs, "--session");
         const textFlag = parseFlag(sessionFlag.rest, "--text");
         const filePath = textFlag.rest[0];
@@ -73,6 +76,7 @@ async function main() {
       }
 
       case "query": {
+        db = new KnownDB(config.dbPath);
         const contextFlag = parseFlag(rawArgs, "--context");
         const question = contextFlag.rest.join(" ").trim();
         if (!question) {
@@ -88,6 +92,7 @@ async function main() {
       }
 
       case "discover": {
+        db = new KnownDB(config.dbPath);
         const result = await discover(db, config);
         if (!result.found) {
           console.log("No non-obvious cross-domain connection found.");
@@ -100,6 +105,7 @@ async function main() {
       }
 
       case "maintain": {
+        db = new KnownDB(config.dbPath);
         const result = maintain(db, config);
         console.log(`Nodes decayed: ${result.nodesDecayed}`);
         console.log(`Nodes pruned: ${result.nodesPruned}`);
@@ -108,7 +114,13 @@ async function main() {
         break;
       }
 
+      case "benchmark": {
+        await runBenchmarkCli(rawArgs);
+        break;
+      }
+
       case "stats": {
+        db = new KnownDB(config.dbPath);
         const stats = db.getStats();
         console.log(`Nodes: ${stats.nodeCount}`);
         console.log(`Edges: ${stats.edgeCount}`);
@@ -133,7 +145,7 @@ async function main() {
     console.error(error instanceof Error ? error.message : error);
     process.exit(1);
   } finally {
-    db.close();
+    db?.close();
   }
 }
 
