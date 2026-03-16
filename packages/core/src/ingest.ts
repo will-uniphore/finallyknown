@@ -5,7 +5,7 @@ import { getOpenAIClient } from "./openai.js";
 import { CONTRADICTION_SYSTEM, CONTRADICTION_USER, INGEST_SYSTEM, INGEST_USER } from "./prompts/ingest.js";
 
 const MIN_SESSION_CHARS = 500;
-const DEDUP_SIMILARITY_THRESHOLD = 0.7;
+const DEDUP_SIMILARITY_THRESHOLD = 0.8;
 const MAX_CONTRADICTION_CHECKS = 3;
 
 interface ExtractedNode {
