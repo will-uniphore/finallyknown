@@ -35,7 +35,7 @@ function parseDiscoverResult(content: string): DiscoverLLMResult {
 export async function discover(db: KnownDB, config: KnownConfig): Promise<DiscoverResult> {
   const runMaintenance = () => maintain(db, config);
 
-  if (db.getStats().nodeCount < 50) {
+  if (db.getStats().nodeCount < 10) {
     return {
       found: false,
       maintenance: runMaintenance(),
