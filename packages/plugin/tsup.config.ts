@@ -8,12 +8,7 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   target: "node20",
-  banner: ({ format }) => {
-    if (format === "esm") {
-      return {
-        js: `import { createRequire } from 'module'; const require = createRequire(import.meta.url);`,
-      };
-    }
-    return {};
-  },
+  // Bundle the workspace "known" package so the plugin is self-contained
+  noExternal: ["known"],
+  // No banner — bundled core handles its own createRequire
 });

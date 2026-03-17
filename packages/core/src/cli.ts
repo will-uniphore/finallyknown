@@ -7,6 +7,7 @@ import { discover } from "./discover.js";
 import { ingest } from "./ingest.js";
 import { maintain } from "./maintain.js";
 import { runBenchmarkCli } from "./tests/benchmark.js";
+import { runGoldenEvalCli } from "./tests/golden-eval.js";
 import { think } from "./think.js";
 
 function usage() {
@@ -18,6 +19,7 @@ function usage() {
   known query "<question>" [--context "<agent context>"]
   known discover
   known maintain
+  known eval [--golden eval/golden-eval.json] [--test encode|activate|dream|implicit|personality|all] [--limit N]
   known benchmark [--test 1a|2a|3a|4a|all] [--personas 5] [--pandora-users 20]
   known stats`);
 }
@@ -116,6 +118,11 @@ async function main() {
 
       case "benchmark": {
         await runBenchmarkCli(rawArgs);
+        break;
+      }
+
+      case "eval": {
+        await runGoldenEvalCli(rawArgs);
         break;
       }
 
