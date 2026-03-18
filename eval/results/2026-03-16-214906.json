@@ -1,0 +1,97 @@
+{
+  "generatedAt": "2026-03-17T04:49:06.017Z",
+  "goldenPath": "/Users/ldxstc/personal/known/eval/golden-eval.json",
+  "metricsPath": "/Users/ldxstc/personal/known/eval/METRICS.md",
+  "options": {
+    "goldenPath": "eval/golden-eval.json",
+    "test": "encode",
+    "limit": 5
+  },
+  "scorecard": [
+    {
+      "test": "ENCODE",
+      "metric": "Recall",
+      "value": "40.7%",
+      "target": "> 70% / fail < 50%",
+      "status": "FAIL"
+    },
+    {
+      "test": "ENCODE",
+      "metric": "Precision",
+      "value": "43.2%",
+      "target": "> 50% / fail < 30%",
+      "status": "WARN"
+    },
+    {
+      "test": "ENCODE",
+      "metric": "F1",
+      "value": "0.420",
+      "target": "> 0.58 / fail < 0.40",
+      "status": "WARN"
+    },
+    {
+      "test": "ENCODE",
+      "metric": "Hallucination",
+      "value": "56.8%",
+      "target": "< 10% / fail > 20%",
+      "status": "FAIL"
+    }
+  ],
+  "knownScore": {
+    "score": 0.41954707985697254,
+    "emoji": "🟠",
+    "partial": true,
+    "weightSum": 0.3
+  },
+  "results": {
+    "encode": {
+      "caseCount": 5,
+      "recall": 0.4074074074074074,
+      "precision": 0.43243243243243246,
+      "f1": 0.41954707985697254,
+      "hallucinationRate": 0.5675675675675675,
+      "cases": [
+        {
+          "id": "encode-pmem-55",
+          "nodeCount": 11,
+          "recall": 0,
+          "precision": 0,
+          "f1": 0,
+          "hallucinationRate": 1
+        },
+        {
+          "id": "encode-pmem-549",
+          "nodeCount": 16,
+          "recall": 0.35,
+          "precision": 0.375,
+          "f1": 0.3620689655172413,
+          "hallucinationRate": 0.625
+        },
+        {
+          "id": "encode-pmem-408",
+          "nodeCount": 20,
+          "recall": 0.8888888888888888,
+          "precision": 0.8,
+          "f1": 0.8421052631578948,
+          "hallucinationRate": 0.19999999999999996
+        },
+        {
+          "id": "encode-pmem-23",
+          "nodeCount": 12,
+          "recall": 0.11764705882352941,
+          "precision": 0.25,
+          "f1": 0.15999999999999998,
+          "hallucinationRate": 0.75
+        },
+        {
+          "id": "encode-pmem-936",
+          "nodeCount": 15,
+          "recall": 0.5333333333333333,
+          "precision": 0.4666666666666667,
+          "f1": 0.49777777777777776,
+          "hallucinationRate": 0.5333333333333333
+        }
+      ]
+    }
+  }
+}

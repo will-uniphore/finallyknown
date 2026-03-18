@@ -1,0 +1,262 @@
+{
+  "generatedAt": "2026-03-17T04:54:59.752Z",
+  "goldenPath": "/Users/ldxstc/personal/known/eval/golden-eval.json",
+  "metricsPath": "/Users/ldxstc/personal/known/eval/METRICS.md",
+  "options": {
+    "goldenPath": "eval/golden-eval.json",
+    "test": "all",
+    "limit": 3
+  },
+  "scorecard": [
+    {
+      "test": "ENCODE",
+      "metric": "Recall",
+      "value": "55.1%",
+      "target": "> 70% / fail < 50%",
+      "status": "WARN"
+    },
+    {
+      "test": "ENCODE",
+      "metric": "Precision",
+      "value": "43.9%",
+      "target": "> 50% / fail < 30%",
+      "status": "WARN"
+    },
+    {
+      "test": "ENCODE",
+      "metric": "F1",
+      "value": "0.488",
+      "target": "> 0.58 / fail < 0.40",
+      "status": "WARN"
+    },
+    {
+      "test": "ENCODE",
+      "metric": "Hallucination",
+      "value": "56.1%",
+      "target": "< 10% / fail > 20%",
+      "status": "FAIL"
+    },
+    {
+      "test": "ACTIVATE",
+      "metric": "Preference",
+      "value": "0.0%",
+      "target": "> 55% / fail < 35%",
+      "status": "FAIL"
+    },
+    {
+      "test": "ACTIVATE",
+      "metric": "Non-sensitive",
+      "value": "0.0%",
+      "target": "> 65% / fail < 45%",
+      "status": "FAIL"
+    },
+    {
+      "test": "ACTIVATE",
+      "metric": "Factual",
+      "value": "0.0%",
+      "target": "> 50% / fail < 30%",
+      "status": "FAIL"
+    },
+    {
+      "test": "DREAM",
+      "metric": "Discovery",
+      "value": "0.0%",
+      "target": "> 30% / fail < 10%",
+      "status": "FAIL"
+    },
+    {
+      "test": "DREAM",
+      "metric": "Genuine",
+      "value": "0.0%",
+      "target": "> 60% / fail < 40%",
+      "status": "FAIL"
+    },
+    {
+      "test": "DREAM",
+      "metric": "Cross-domain",
+      "value": "0.0%",
+      "target": "> 50% / fail < 20%",
+      "status": "FAIL"
+    },
+    {
+      "test": "DREAM",
+      "metric": "Hallucination",
+      "value": "0.0%",
+      "target": "< 20% / fail > 35%",
+      "status": "PASS"
+    },
+    {
+      "test": "IMPLICIT",
+      "metric": "Detection",
+      "value": "66.7%",
+      "target": "> 40% / fail < 20%",
+      "status": "PASS"
+    },
+    {
+      "test": "IMPLICIT",
+      "metric": "Quality",
+      "value": "66.7%",
+      "target": "> 50% / fail < 30%",
+      "status": "PASS"
+    },
+    {
+      "test": "PERSONALITY",
+      "metric": "Mean r",
+      "value": "n/a",
+      "target": "> 0.20 / fail < 0.10",
+      "status": "FAIL"
+    },
+    {
+      "test": "PERSONALITY",
+      "metric": "Traits >= 0.25",
+      "value": "0/5",
+      "target": ">= 2 / fail 0",
+      "status": "FAIL"
+    },
+    {
+      "test": "PERSONALITY",
+      "metric": "Best trait r",
+      "value": "openness n/a",
+      "target": "> 0.30 / fail < 0.15",
+      "status": "FAIL"
+    }
+  ],
+  "knownScore": {
+    "score": null,
+    "emoji": "🔴",
+    "partial": false,
+    "weightSum": 1
+  },
+  "results": {
+    "encode": {
+      "caseCount": 3,
+      "recall": 0.5510204081632653,
+      "precision": 0.43859649122807015,
+      "f1": 0.48842257597684513,
+      "hallucinationRate": 0.5614035087719298,
+      "cases": [
+        {
+          "id": "encode-pmem-55",
+          "nodeCount": 11,
+          "recall": 0,
+          "precision": 0,
+          "f1": 0,
+          "hallucinationRate": 1
+        },
+        {
+          "id": "encode-pmem-549",
+          "nodeCount": 21,
+          "recall": 0.55,
+          "precision": 0.42857142857142855,
+          "f1": 0.4817518248175182,
+          "hallucinationRate": 0.5714285714285714
+        },
+        {
+          "id": "encode-pmem-408",
+          "nodeCount": 25,
+          "recall": 0.8888888888888888,
+          "precision": 0.64,
+          "f1": 0.7441860465116279,
+          "hallucinationRate": 0.36
+        }
+      ]
+    },
+    "activate": {
+      "caseCount": 3,
+      "preferenceIncorporation": 0,
+      "nonSensitiveAccuracy": 0,
+      "factualAccuracy": 0,
+      "cases": [
+        {
+          "id": "activate-pmem-55-0",
+          "sensitive": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": false
+        },
+        {
+          "id": "activate-pmem-55-1",
+          "sensitive": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": false
+        },
+        {
+          "id": "activate-pmem-55-2",
+          "sensitive": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": false
+        }
+      ]
+    },
+    "dream": {
+      "caseCount": 1,
+      "discoveryRate": 0,
+      "genuineRate": 0,
+      "crossDomainRate": 0,
+      "hallucinationRate": 0,
+      "cases": [
+        {
+          "id": "dream-pmem-549",
+          "foundRuns": 0,
+          "totalInsights": 0,
+          "discoveryRate": 0,
+          "genuineRate": 0,
+          "crossDomainRate": 0,
+          "hallucinationRate": 0
+        }
+      ]
+    },
+    "implicit": {
+      "caseCount": 3,
+      "detectionRate": 0.6666666666666666,
+      "inferenceQuality": 0.6666666666666666,
+      "cases": [
+        {
+          "id": "implicit-pmem-55-0",
+          "detected": true,
+          "score": 4
+        },
+        {
+          "id": "implicit-pmem-55-1",
+          "detected": false,
+          "score": 1
+        },
+        {
+          "id": "implicit-pmem-55-2",
+          "detected": true,
+          "score": 3
+        }
+      ]
+    },
+    "personality": {
+      "caseCount": 3,
+      "validCases": 0,
+      "meanCorrelation": null,
+      "traitsAbove025": 0,
+      "bestTrait": {
+        "trait": "openness",
+        "correlation": null
+      },
+      "correlations": {
+        "openness": null,
+        "conscientiousness": null,
+        "extraversion": null,
+        "agreeableness": null,
+        "neuroticism": null
+      },
+      "cases": [
+        {
+          "id": "personality-pandora-pandora-419",
+          "predicted": null
+        },
+        {
+          "id": "personality-pandora-pandora-86",
+          "predicted": null
+        },
+        {
+          "id": "personality-pandora-pandora-1009",
+          "predicted": null
+        }
+      ]
+    }
+  }
+}

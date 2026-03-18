@@ -124,6 +124,7 @@ interface PersonaMemExtractedData {
 interface TraitJudgeResult {
   matched_ground_truth_indices?: number[];
   matched_extracted_indices?: number[];
+  hallucinated_extracted_indices?: number[];
 }
 
 interface ActivateJudgeResult {
@@ -600,10 +601,15 @@ Count a ground-truth trait as matched when at least one extracted node captures 
 Count an extracted node as matched only when it clearly corresponds to one of the ground-truth traits.
 Do not give credit for demographic facts or unsupported inferences.
 
+Separate these cases clearly:
+- A valid extracted node may be supported by the conversation but absent from the ground-truth list.
+- A hallucinated node has no evidence support in the conversation and appears fabricated.
+
 Return JSON:
 {
   "matched_ground_truth_indices": [0],
-  "matched_extracted_indices": [1]
+  "matched_extracted_indices": [1],
+  "hallucinated_extracted_indices": [2]
 }`,
       },
       {
@@ -793,9 +799,100 @@ Return JSON:
   return results;
 }
 
+async function scoreBigFiveFromTraitCodes(
+  config: KnownConfig,
+  nodes: NodeRow[],
+  activateResponse: string,
+): Promise<BigFiveScores | null> {
+  const openai = getOpenAIClient(config);
+  const response = await openai.chat.completions.create({
+    model: config.synthesisModel,
+    temperature: 0,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content: `Based on the trait codes extracted for this person, rate their Big Five personality from 0 to 100.
+
+Return ONLY JSON:
+{
+  "openness": 50,
+  "conscientiousness": 50,
+  "extraversion": 50,
+  "agreeableness": 50,
+  "neuroticism": 50
+}`,
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          trait_codes: nodes.map((node) => ({
+            type: node.type,
+            text: node.text,
+            confidence: node.confidence,
+            times_observed: node.times_observed,
+          })),
+          activate_summary: activateResponse,
+        }),
+      },
+    ],
+  });
+
+  return parseBigFiveResponse(response.choices[0]?.message?.content ?? "");
+}
+
 function loadPersonaMemLookup() {
   const extracted = readJsonFile<PersonaMemExtractedData>(PERSONAMEM_JSON_PATH);
   return new Map<number, PersonaMemPersona>(extracted.personas.map((persona) => [persona.personaId, persona]));
+}
+
+function parsePersonaIdFromCaseId(caseId: string) {
+  const match = caseId.match(/-(\d+)(?:-[^-]+)?$/);
+  if (!match) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(match[1]!, 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function dedupeStrings(values: string[]) {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+
+  for (const value of values) {
+    const normalized = value.trim();
+    if (!normalized) {
+      continue;
+    }
+
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    ordered.push(normalized);
+  }
+
+  return ordered;
+}
+
+function buildEncodeConversationsByPersona(cases: EncodeCase[]) {
+  const conversations = new Map<number, string[]>();
+
+  for (const evalCase of cases) {
+    const personaId = parsePersonaIdFromCaseId(evalCase.id);
+    if (personaId === undefined) {
+      continue;
+    }
+
+    const existing = conversations.get(personaId) ?? [];
+    existing.push(evalCase.input.conversation_text);
+    conversations.set(personaId, dedupeStrings(existing));
+  }
+
+  return conversations;
 }
 
 function selectCases<T extends GoldenEvalCase>(data: GoldenEvalData, type: T["type"], limit?: number): T[] {
@@ -812,6 +909,7 @@ async function runEncodeEval(baseConfig: KnownConfig, cases: EncodeCase[]): Prom
   let totalGroundTruth = 0;
   let matchedExtracted = 0;
   let totalExtracted = 0;
+  let hallucinatedExtracted = 0;
 
   for (const evalCase of cases) {
     const encodedNodes = await withFreshDb(`golden-encode-${evalCase.id}`, baseConfig, async (db, config) => {
@@ -823,17 +921,19 @@ async function runEncodeEval(baseConfig: KnownConfig, cases: EncodeCase[]): Prom
     const judged = await judgeTraitExtraction(baseConfig, evalCase.id, evalCase.ground_truth.traits, extractedNodes);
     const matchedGroundTruthIndices = new Set(judged.matched_ground_truth_indices ?? []);
     const matchedExtractedIndices = new Set(judged.matched_extracted_indices ?? []);
+    const hallucinatedExtractedIndices = new Set(judged.hallucinated_extracted_indices ?? []);
 
     const recall =
       evalCase.ground_truth.traits.length === 0 ? 0 : matchedGroundTruthIndices.size / evalCase.ground_truth.traits.length;
     const precision = extractedNodes.length === 0 ? 0 : matchedExtractedIndices.size / extractedNodes.length;
     const f1 = recall + precision === 0 ? 0 : (2 * recall * precision) / (recall + precision);
-    const hallucinationRate = extractedNodes.length === 0 ? 0 : 1 - precision;
+    const hallucinationRate = extractedNodes.length === 0 ? 0 : hallucinatedExtractedIndices.size / extractedNodes.length;
 
     matchedGroundTruth += matchedGroundTruthIndices.size;
     totalGroundTruth += evalCase.ground_truth.traits.length;
     matchedExtracted += matchedExtractedIndices.size;
     totalExtracted += extractedNodes.length;
+    hallucinatedExtracted += hallucinatedExtractedIndices.size;
     caseResults.push({
       id: evalCase.id,
       nodeCount: extractedNodes.length,
@@ -847,7 +947,7 @@ async function runEncodeEval(baseConfig: KnownConfig, cases: EncodeCase[]): Prom
   const recall = totalGroundTruth === 0 ? 0 : matchedGroundTruth / totalGroundTruth;
   const precision = totalExtracted === 0 ? 0 : matchedExtracted / totalExtracted;
   const f1 = recall + precision === 0 ? 0 : (2 * recall * precision) / (recall + precision);
-  const hallucinationRate = totalExtracted === 0 ? 0 : 1 - precision;
+  const hallucinationRate = totalExtracted === 0 ? 0 : hallucinatedExtracted / totalExtracted;
 
   console.log(
     `Recall ${formatPercent(recall)} | Precision ${formatPercent(precision)} | F1 ${formatRatio(f1)} | Hallucination ${formatPercent(hallucinationRate)}`,
@@ -879,26 +979,34 @@ async function runActivateEval(
     response: string;
     sensitive: boolean;
   }> = [];
+  const casesByPersona = new Map<number, ActivateCase[]>();
 
   for (const evalCase of cases) {
-    const persona = personaLookup.get(evalCase.input.persona_id);
+    const existing = casesByPersona.get(evalCase.input.persona_id) ?? [];
+    existing.push(evalCase);
+    casesByPersona.set(evalCase.input.persona_id, existing);
+  }
+
+  for (const [personaId, personaCases] of casesByPersona.entries()) {
+    const persona = personaLookup.get(personaId);
     if (!persona) {
-      throw new Error(`Missing PersonaMem conversation for persona ${evalCase.input.persona_id}`);
+      throw new Error(`Missing PersonaMem conversation for persona ${personaId}`);
     }
 
-    const response = await withFreshDb(`golden-activate-${evalCase.id}`, baseConfig, async (db, config) => {
+    await withFreshDb(`golden-activate-persona-${personaId}`, baseConfig, async (db, config) => {
       await ingest(db, persona.conversationText, config, `persona-${persona.personaId}`);
-      const result = await think(db, evalCase.input.question, config);
-      return result.response;
-    });
 
-    pendingJudgment.push({
-      id: evalCase.id,
-      question: evalCase.input.question,
-      preferenceTested: evalCase.ground_truth.preference_tested,
-      correctAnswer: evalCase.ground_truth.correct_answer,
-      response,
-      sensitive: isSensitivePreference(evalCase.ground_truth.preference_tested),
+      for (const evalCase of personaCases) {
+        const result = await think(db, evalCase.input.question, config);
+        pendingJudgment.push({
+          id: evalCase.id,
+          question: evalCase.input.question,
+          preferenceTested: evalCase.ground_truth.preference_tested,
+          correctAnswer: evalCase.ground_truth.correct_answer,
+          response: result.response,
+          sensitive: isSensitivePreference(evalCase.ground_truth.preference_tested),
+        });
+      }
     });
   }
 
@@ -951,7 +1059,11 @@ async function runActivateEval(
   };
 }
 
-async function runDreamEval(baseConfig: KnownConfig, cases: DreamCase[]): Promise<DreamSummary> {
+async function runDreamEval(
+  baseConfig: KnownConfig,
+  cases: DreamCase[],
+  encodeConversationsByPersona: Map<number, string[]>,
+): Promise<DreamSummary> {
   printSection("DREAM");
   console.log(`Running ${cases.length} dream cases`);
 
@@ -964,8 +1076,15 @@ async function runDreamEval(baseConfig: KnownConfig, cases: DreamCase[]): Promis
   let discoveredInsightTotal = 0;
 
   for (const evalCase of cases) {
+    const dreamCorpus = dedupeStrings([
+      ...(encodeConversationsByPersona.get(evalCase.input.persona_id) ?? []),
+      evalCase.input.conversation_text,
+    ]);
+
     const occurrences = await withFreshDb(`golden-dream-${evalCase.id}`, baseConfig, async (db, config) => {
-      await ingest(db, evalCase.input.conversation_text, config, evalCase.id);
+      for (const [index, conversationText] of dreamCorpus.entries()) {
+        await ingest(db, conversationText, config, `${evalCase.id}-corpus-${index}`);
+      }
 
       const insightOccurrences = new Map<
         string,
@@ -1167,9 +1286,9 @@ async function runPersonalityEval(baseConfig: KnownConfig, cases: PersonalityCas
         db,
         BIG_FIVE_QUERY,
         config,
-        "Golden eval mode. Return only minified JSON with numeric keys openness, conscientiousness, extraversion, agreeableness, and neuroticism.",
+        "Golden eval mode. Summarize the relevant trait codes for Big Five scoring.",
       );
-      return parseBigFiveResponse(result.response);
+      return scoreBigFiveFromTraitCodes(config, db.getAllNodes(), result.response);
     });
 
     caseResults.push({ id: evalCase.id, predicted });
@@ -1394,21 +1513,22 @@ function computeKnownScore(results: {
   personality?: PersonalitySummary;
 }) {
   const contributions: Array<{ test: GoldenEvalTestId; raw: number }> = [];
+  const normalizeRaw = (value: number) => (Number.isFinite(value) ? value : 0);
 
   if (results.encode) {
-    contributions.push({ test: "encode", raw: results.encode.f1 });
+    contributions.push({ test: "encode", raw: normalizeRaw(results.encode.f1) });
   }
   if (results.activate) {
-    contributions.push({ test: "activate", raw: results.activate.preferenceIncorporation });
+    contributions.push({ test: "activate", raw: normalizeRaw(results.activate.preferenceIncorporation) });
   }
   if (results.dream) {
-    contributions.push({ test: "dream", raw: results.dream.genuineRate });
+    contributions.push({ test: "dream", raw: normalizeRaw(results.dream.genuineRate) });
   }
   if (results.implicit) {
-    contributions.push({ test: "implicit", raw: results.implicit.detectionRate });
+    contributions.push({ test: "implicit", raw: normalizeRaw(results.implicit.detectionRate) });
   }
   if (results.personality) {
-    contributions.push({ test: "personality", raw: clampUnit(results.personality.meanCorrelation / 0.5) });
+    contributions.push({ test: "personality", raw: normalizeRaw(clampUnit(results.personality.meanCorrelation / 0.5)) });
   }
 
   const weightSum = contributions.reduce((sum, entry) => sum + SCORE_WEIGHTS[entry.test], 0);
@@ -1461,6 +1581,8 @@ export async function runGoldenEvalCli(args: string[] = []) {
   const goldenData = readJsonFile<GoldenEvalData>(goldenPath);
   const baseConfig = getEvalConfig();
   const personaLookup = needsPersonaMem ? loadPersonaMemLookup() : new Map<number, PersonaMemPersona>();
+  const encodeCases = selectCases<EncodeCase>(goldenData, "encode_quality");
+  const encodeConversationsByPersona = buildEncodeConversationsByPersona(encodeCases);
   const results: {
     encode?: EncodeSummary;
     activate?: ActivateSummary;
@@ -1470,7 +1592,10 @@ export async function runGoldenEvalCli(args: string[] = []) {
   } = {};
 
   if (options.test === "all" || options.test === "encode") {
-    results.encode = await runEncodeEval(baseConfig, selectCases<EncodeCase>(goldenData, "encode_quality", options.limit));
+    results.encode = await runEncodeEval(
+      baseConfig,
+      typeof options.limit === "number" ? encodeCases.slice(0, options.limit) : encodeCases,
+    );
   }
 
   if (options.test === "all" || options.test === "activate") {
@@ -1482,7 +1607,11 @@ export async function runGoldenEvalCli(args: string[] = []) {
   }
 
   if (options.test === "all" || options.test === "dream") {
-    results.dream = await runDreamEval(baseConfig, selectCases<DreamCase>(goldenData, "dream_discovery", options.limit));
+    results.dream = await runDreamEval(
+      baseConfig,
+      selectCases<DreamCase>(goldenData, "dream_discovery", options.limit),
+      encodeConversationsByPersona,
+    );
   }
 
   if (options.test === "all" || options.test === "implicit") {
