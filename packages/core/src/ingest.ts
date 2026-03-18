@@ -2,11 +2,19 @@ import type { KnownConfig } from "./config.js";
 import type { KnownDB, NodeRow } from "./db.js";
 import { generateEmbeddings, semanticSearch } from "./embeddings.js";
 import { getOpenAIClient } from "./openai.js";
-import { CONTRADICTION_SYSTEM, CONTRADICTION_USER, INGEST_SYSTEM, INGEST_USER } from "./prompts/ingest.js";
+import {
+  CONTRADICTION_SYSTEM,
+  CONTRADICTION_USER,
+  INGEST_FACT_SYSTEM,
+  INGEST_FACT_USER,
+  INGEST_SYSTEM,
+  INGEST_USER,
+} from "./prompts/ingest.js";
 
 const MIN_SESSION_CHARS = 500;
 const DEDUP_SIMILARITY_THRESHOLD = 0.8;
 const MAX_CONTRADICTION_CHECKS = 3;
+const FACT_TYPE_PREFIX = "fact:";
 
 interface ExtractedNode {
   text: string;
@@ -30,13 +38,39 @@ interface ContradictionResult {
 }
 
 function normalizeNodeType(type?: string): string {
-  const normalized = type
-    ?.trim()
+  const trimmed = type?.trim().toLowerCase() ?? "";
+  const isFact = trimmed.startsWith(FACT_TYPE_PREFIX);
+  const rawType = isFact ? trimmed.slice(FACT_TYPE_PREFIX.length) : trimmed;
+  const normalized = rawType
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
 
+  if (isFact) {
+    return `${FACT_TYPE_PREFIX}${normalized || "detail"}`;
+  }
+
   return normalized || "trait";
+}
+
+function isFactNodeType(type: string) {
+  return type.startsWith(FACT_TYPE_PREFIX);
+}
+
+function isGenericNodeType(type: string) {
+  return type === "trait" || type === `${FACT_TYPE_PREFIX}detail`;
+}
+
+function choosePreferredNodeType(existingType: string, incomingType: string) {
+  if (isFactNodeType(incomingType) && !isFactNodeType(existingType)) {
+    return incomingType;
+  }
+
+  if (!isGenericNodeType(incomingType) && isGenericNodeType(existingType)) {
+    return incomingType;
+  }
+
+  return existingType;
 }
 
 function dedupeNodes(nodes: ExtractedNode[]) {
@@ -49,12 +83,52 @@ function dedupeNodes(nodes: ExtractedNode[]) {
 
     const key = text.toLowerCase();
     const type = normalizeNodeType(node.type);
-    if (!deduped.has(key)) {
+    const existing = deduped.get(key);
+    if (!existing) {
       deduped.set(key, { text, type });
+      continue;
+    }
+
+    deduped.set(key, {
+      text,
+      type: choosePreferredNodeType(existing.type ?? "trait", type),
+    });
+  }
+
+  return [...deduped.values()];
+}
+
+function dedupeEdges(edges: ExtractedEdge[]) {
+  const deduped = new Map<string, ExtractedEdge>();
+
+  for (const edge of edges) {
+    const sourceText = edge.source_text?.trim();
+    const targetText = edge.target_text?.trim();
+    const relation = edge.relation?.trim();
+    if (!sourceText || !targetText || !relation) {
+      continue;
+    }
+
+    const text = edge.text?.trim();
+    const key = [sourceText.toLowerCase(), targetText.toLowerCase(), relation.toLowerCase(), text?.toLowerCase() ?? ""].join("\0");
+    if (!deduped.has(key)) {
+      deduped.set(key, {
+        source_text: sourceText,
+        target_text: targetText,
+        relation,
+        text: text || undefined,
+      });
     }
   }
 
   return [...deduped.values()];
+}
+
+function tagFactNodes(nodes: ExtractedNode[]) {
+  return nodes.map((node) => ({
+    ...node,
+    type: `${FACT_TYPE_PREFIX}${node.type?.trim() || "detail"}`,
+  }));
 }
 
 function parseExtraction(content: string): ExtractionResult {
@@ -118,6 +192,14 @@ function shouldSkipSession(sessionText: string): boolean {
   return sessionText.trim().length < MIN_SESSION_CHARS || !hasUserMessages(sessionText);
 }
 
+function shouldReplaceStoredType(existingType: string, incomingType: string) {
+  if (isFactNodeType(incomingType) && !isFactNodeType(existingType)) {
+    return true;
+  }
+
+  return isGenericNodeType(existingType);
+}
+
 async function resolveObservationStorage(
   db: KnownDB,
   config: KnownConfig,
@@ -127,10 +209,11 @@ async function resolveObservationStorage(
 ): Promise<{ created: boolean; row: NodeRow }> {
   const exact = db.findNodeByTypeAndText(normalizeNodeType(node.type), node.text);
   if (exact) {
+    const nextType = normalizeNodeType(node.type);
     const row = db.reconfirmNodeObservation(exact.id, {
       source,
       embedding,
-      type: exact.type === "trait" ? normalizeNodeType(node.type) : exact.type,
+      type: shouldReplaceStoredType(exact.type, nextType) ? nextType : exact.type,
     });
 
     return { created: false, row: row ?? exact };
@@ -145,10 +228,11 @@ async function resolveObservationStorage(
   for (const candidate of similar) {
     const relation = await judgeObservationRelationship(config, candidate.text, node.text);
     if (relation === "same") {
+      const nextType = normalizeNodeType(node.type);
       confirmedMatch = db.reconfirmNodeObservation(candidate.id, {
         source,
         embedding,
-        type: candidate.type === "trait" ? normalizeNodeType(node.type) : candidate.type,
+        type: shouldReplaceStoredType(candidate.type, nextType) ? nextType : candidate.type,
       });
       break;
     }
@@ -217,23 +301,30 @@ async function ingestChunk(
   sessionId?: string,
 ): Promise<{ nodesCreated: number; edgesCreated: number }> {
   const openai = getOpenAIClient(config);
-  const response = await openai.chat.completions.create({
-    model: config.extractionModel,
-    messages: [
-      { role: "system", content: INGEST_SYSTEM },
-      { role: "user", content: INGEST_USER(sessionText) },
-    ],
-    response_format: { type: "json_object" },
-    temperature: 0.1,
-  });
+  const [patternResponse, factResponse] = await Promise.all([
+    openai.chat.completions.create({
+      model: config.extractionModel,
+      messages: [
+        { role: "system", content: INGEST_SYSTEM },
+        { role: "user", content: INGEST_USER(sessionText) },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+    }),
+    openai.chat.completions.create({
+      model: config.extractionModel,
+      messages: [
+        { role: "system", content: INGEST_FACT_SYSTEM },
+        { role: "user", content: INGEST_FACT_USER(sessionText) },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+    }),
+  ]);
 
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    return { nodesCreated: 0, edgesCreated: 0 };
-  }
-
-  const extracted = parseExtraction(content);
-  const nodes = dedupeNodes(extracted.nodes ?? []);
+  const patternExtraction = parseExtraction(patternResponse.choices[0]?.message?.content ?? "");
+  const factExtraction = parseExtraction(factResponse.choices[0]?.message?.content ?? "");
+  const nodes = dedupeNodes([...(patternExtraction.nodes ?? []), ...tagFactNodes(factExtraction.nodes ?? [])]);
   if (nodes.length === 0) {
     return { nodesCreated: 0, edgesCreated: 0 };
   }
@@ -251,7 +342,7 @@ async function ingestChunk(
   }
 
   let edgesCreated = 0;
-  for (const edge of extracted.edges ?? []) {
+  for (const edge of dedupeEdges([...(patternExtraction.edges ?? []), ...(factExtraction.edges ?? [])])) {
     const sourceText = edge.source_text?.trim();
     const targetText = edge.target_text?.trim();
     const relation = edge.relation?.trim();

@@ -1,50 +1,81 @@
-export const INGEST_SYSTEM = `You extract TWO types of observations for "Known," a brain-like user understanding system.
+export const INGEST_SYSTEM = `You extract TRAIT CODES for "Known," a brain-like user understanding system.
 
-The human brain stores knowledge at TWO levels (Complementary Learning Systems):
-1. TRAIT CODES (neocortex) — compressed personality patterns
-2. PERSONAL FACTS (hippocampus) — specific details that define this person
+Do not extract raw facts, tasks, or requests. Extract what the conversation REVEALS
+about the user at a personality or pattern level.
 
-Extract BOTH from this conversation.
-
-=== TRAIT CODES ===
-Personality-level patterns revealed by behavior:
-- decision style, communication style, stress responses
+Good targets:
+- decision style
+- communication style
+- stress responses
 - values revealed by tradeoffs
-- behavioral patterns and blind spots
-- aesthetic tendencies with domain specifics
+- recurring avoidance or overcompensation patterns
+- aesthetic tendencies
+- blind spots or self-undermining habits
 
-=== PERSONAL FACTS ===
-Specific details that make this person THEM:
-- specific hobbies BY NAME ("forages for wild mushrooms", not "enjoys nature")
-- health conditions, injuries, diagnoses
-- significant life events and experiences
-- concrete preferences ("prefers herbal tea from East Asia over coffee")
-- skills, expertise areas
-- relationships and family details mentioned
-- places they've lived or frequent
-
-=== BAD TARGETS (do NOT extract) ===
-- one-off task requests
-- transient scheduling details
-- sensitive data (phone numbers, addresses, passwords)
-- generic observations that could describe 80% of people
-
-CRITICAL RULES:
-- BE SPECIFIC. "forages for wild mushrooms in forests" >> "enjoys nature"
-- "has a past knee injury from steep hiking terrain" >> "approaches health proactively"
-- Every node should make this person DISTINGUISHABLE from others
-- Extract 10-20 nodes per conversation chunk. More specific = better. Err on the side of MORE observations — it's better to have too many than too few.
+Bad targets:
+- one-off factual details
+- project names
+- transient asks
+- generic summaries of the session
 
 Return a compact JSON object:
 {
   "nodes": [
     {
-      "text": "forages for wild mushrooms in forests",
-      "type": "hobby"
-    },
-    {
-      "text": "avoids confrontation when stressed, defaults to over-preparation",
+      "text": "avoids confrontation when stressed",
       "type": "stress_response"
+    }
+  ],
+  "edges": []
+}
+
+Rules:
+- Each node text must be a standalone trait code or behavioral pattern
+- Prefer compressed, durable observations over literal paraphrases
+- Provide a short free-form domain tag for each node
+- Aim for roughly 8-12 strong pattern nodes per conversation chunk
+- Do not include concrete personal facts here; those belong in the fact pass
+- Only include edges when the conversation itself clearly ties two extracted trait codes together
+- Return valid JSON only`;
+
+export const INGEST_USER = (sessionText: string) =>
+  `Extract pattern-level trait codes from this session.\n\n${sessionText}`;
+
+export const INGEST_FACT_SYSTEM = `You extract SPECIFIC PERSONAL FACTS for "Known," a brain-like user understanding system.
+
+Do not extract abstract personality patterns here. Extract the concrete facts, preferences,
+history, and named interests that make this person uniquely themselves.
+
+Good targets:
+- specific hobbies and interests by name
+- concrete preferences and dislikes
+- health history, injuries, diagnoses, sensitivities
+- significant life events and formative experiences
+- specific skills, expertise areas, and repeated domains of competence
+- relationships, family details, named people, and social roles
+- places, routines, recurring activities, and favored environments
+
+Bad targets:
+- broad personality descriptions
+- generic communication or decision patterns
+- vague abstractions that could describe many people
+- one-off task requests or transient scheduling details
+- sensitive data such as phone numbers, addresses, passwords, SSNs, API keys
+
+Specificity rules:
+- "enjoys abstract modernist architecture" is good
+- "likes design" is too abstract
+- "prefers herbal tea from East Asia over coffee" is good
+- "has refined taste" is too abstract
+- "past knee injury from hiking steep terrain" is good
+- "is health-conscious" is too abstract
+
+Return a compact JSON object:
+{
+  "nodes": [
+    {
+      "text": "enjoys abstract modernist architecture",
+      "type": "interest"
     },
     {
       "text": "past knee injury from hiking steep terrain",
@@ -55,14 +86,15 @@ Return a compact JSON object:
 }
 
 Rules:
-- Mix of trait codes AND personal facts
-- Each node text must be standalone and specific
-- Provide a short free-form domain tag
-- Only include edges when the conversation clearly ties two observations
+- Each node text must be specific, concrete, and unique to this person
+- Prefer names, places, activities, events, and clear preferences over abstractions
+- Aim for roughly 10-15 specific fact nodes per conversation chunk when supported
+- Exclude generic patterns; those belong in the pattern pass
+- Only include edges when the conversation clearly ties two extracted facts together
 - Return valid JSON only`;
 
-export const INGEST_USER = (sessionText: string) =>
-  `Extract trait codes from this session.\n\n${sessionText}`;
+export const INGEST_FACT_USER = (sessionText: string) =>
+  `Extract specific personal facts from this session.\n\n${sessionText}`;
 
 export const CONTRADICTION_SYSTEM = `You compare two trait codes about the same user.
 
