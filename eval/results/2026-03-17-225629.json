@@ -1,0 +1,109 @@
+{
+  "generatedAt": "2026-03-18T05:56:29.144Z",
+  "goldenPath": "/Users/ldxstc/personal/known/eval/golden-eval.json",
+  "metricsPath": "/Users/ldxstc/personal/known/eval/METRICS.md",
+  "options": {
+    "goldenPath": "eval/golden-eval.json",
+    "test": "activate",
+    "limit": 10
+  },
+  "scorecard": [
+    {
+      "test": "ACTIVATE",
+      "metric": "Preference",
+      "value": "0.0%",
+      "target": "> 55% / fail < 35%",
+      "status": "FAIL"
+    },
+    {
+      "test": "ACTIVATE",
+      "metric": "Non-sensitive",
+      "value": "0.0%",
+      "target": "> 65% / fail < 45%",
+      "status": "FAIL"
+    },
+    {
+      "test": "ACTIVATE",
+      "metric": "Factual",
+      "value": "0.0%",
+      "target": "> 50% / fail < 30%",
+      "status": "FAIL"
+    }
+  ],
+  "knownScore": {
+    "score": 0,
+    "emoji": "🔴",
+    "partial": true,
+    "weightSum": 0.3
+  },
+  "results": {
+    "activate": {
+      "caseCount": 10,
+      "preferenceIncorporation": 0,
+      "nonSensitiveAccuracy": 0,
+      "factualAccuracy": 0,
+      "cases": [
+        {
+          "id": "activate-pmem-55-0",
+          "sensitive": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": false
+        },
+        {
+          "id": "activate-pmem-55-1",
+          "sensitive": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": false
+        },
+        {
+          "id": "activate-pmem-55-2",
+          "sensitive": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": false
+        },
+        {
+          "id": "activate-pmem-55-3",
+          "sensitive": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": false
+        },
+        {
+          "id": "activate-pmem-55-4",
+          "sensitive": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": false
+        },
+        {
+          "id": "activate-pmem-549-0",
+          "sensitive": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": false
+        },
+        {
+          "id": "activate-pmem-549-1",
+          "sensitive": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": false
+        },
+        {
+          "id": "activate-pmem-549-2",
+          "sensitive": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": false
+        },
+        {
+          "id": "activate-pmem-549-3",
+          "sensitive": true,
+          "incorporatesPreference": false,
+          "factualAccuracy": false
+        },
+        {
+          "id": "activate-pmem-549-4",
+          "sensitive": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": false
+        }
+      ]
+    }
+  }
+}

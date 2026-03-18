@@ -1,0 +1,280 @@
+{
+  "generatedAt": "2026-03-18T05:42:15.818Z",
+  "goldenPath": "/Users/ldxstc/personal/known/eval/golden-eval.json",
+  "metricsPath": "/Users/ldxstc/personal/known/eval/METRICS.md",
+  "options": {
+    "goldenPath": "eval/golden-eval.json",
+    "test": "all",
+    "limit": 3
+  },
+  "scorecard": [
+    {
+      "test": "ENCODE",
+      "metric": "Recall",
+      "value": "63.3%",
+      "target": "> 70% / fail < 50%",
+      "status": "WARN"
+    },
+    {
+      "test": "ENCODE",
+      "metric": "Precision",
+      "value": "48.3%",
+      "target": "> 50% / fail < 30%",
+      "status": "WARN"
+    },
+    {
+      "test": "ENCODE",
+      "metric": "F1",
+      "value": "0.548",
+      "target": "> 0.58 / fail < 0.40",
+      "status": "WARN"
+    },
+    {
+      "test": "ENCODE",
+      "metric": "Hallucination",
+      "value": "29.3%",
+      "target": "< 10% / fail > 20%",
+      "status": "FAIL"
+    },
+    {
+      "test": "ACTIVATE",
+      "metric": "Preference",
+      "value": "0.0%",
+      "target": "> 55% / fail < 35%",
+      "status": "FAIL"
+    },
+    {
+      "test": "ACTIVATE",
+      "metric": "Non-sensitive",
+      "value": "0.0%",
+      "target": "> 65% / fail < 45%",
+      "status": "FAIL"
+    },
+    {
+      "test": "ACTIVATE",
+      "metric": "Factual",
+      "value": "0.0%",
+      "target": "> 50% / fail < 30%",
+      "status": "FAIL"
+    },
+    {
+      "test": "DREAM",
+      "metric": "Discovery",
+      "value": "0.0%",
+      "target": "> 30% / fail < 10%",
+      "status": "FAIL"
+    },
+    {
+      "test": "DREAM",
+      "metric": "Genuine",
+      "value": "0.0%",
+      "target": "> 60% / fail < 40%",
+      "status": "FAIL"
+    },
+    {
+      "test": "DREAM",
+      "metric": "Cross-domain",
+      "value": "0.0%",
+      "target": "> 50% / fail < 20%",
+      "status": "FAIL"
+    },
+    {
+      "test": "DREAM",
+      "metric": "Hallucination",
+      "value": "0.0%",
+      "target": "< 20% / fail > 35%",
+      "status": "PASS"
+    },
+    {
+      "test": "IMPLICIT",
+      "metric": "Detection",
+      "value": "100.0%",
+      "target": "> 40% / fail < 20%",
+      "status": "PASS"
+    },
+    {
+      "test": "IMPLICIT",
+      "metric": "Quality",
+      "value": "100.0%",
+      "target": "> 50% / fail < 30%",
+      "status": "PASS"
+    },
+    {
+      "test": "PERSONALITY",
+      "metric": "Mean r",
+      "value": "0.152",
+      "target": "> 0.20 / fail < 0.10",
+      "status": "WARN"
+    },
+    {
+      "test": "PERSONALITY",
+      "metric": "Traits >= 0.25",
+      "value": "3/5",
+      "target": ">= 2 / fail 0",
+      "status": "PASS"
+    },
+    {
+      "test": "PERSONALITY",
+      "metric": "Best trait r",
+      "value": "agreeableness 0.993",
+      "target": "> 0.30 / fail < 0.15",
+      "status": "PASS"
+    }
+  ],
+  "knownScore": {
+    "score": 0.30981665282003157,
+    "emoji": "🟠",
+    "partial": false,
+    "weightSum": 1
+  },
+  "results": {
+    "encode": {
+      "caseCount": 3,
+      "recall": 0.6326530612244898,
+      "precision": 0.4827586206896552,
+      "f1": 0.5476340694006309,
+      "hallucinationRate": 0.29310344827586204,
+      "cases": [
+        {
+          "id": "encode-pmem-55",
+          "nodeCount": 17,
+          "recall": 0.5454545454545454,
+          "precision": 0.5882352941176471,
+          "f1": 0.5660377358490566,
+          "hallucinationRate": 0.29411764705882354
+        },
+        {
+          "id": "encode-pmem-549",
+          "nodeCount": 18,
+          "recall": 0.6,
+          "precision": 0.2777777777777778,
+          "f1": 0.37974683544303794,
+          "hallucinationRate": 0.6666666666666666
+        },
+        {
+          "id": "encode-pmem-408",
+          "nodeCount": 23,
+          "recall": 0.7222222222222222,
+          "precision": 0.5652173913043478,
+          "f1": 0.6341463414634146,
+          "hallucinationRate": 0
+        }
+      ]
+    },
+    "activate": {
+      "caseCount": 3,
+      "preferenceIncorporation": 0,
+      "nonSensitiveAccuracy": 0,
+      "factualAccuracy": 0,
+      "cases": [
+        {
+          "id": "activate-pmem-55-0",
+          "sensitive": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": false
+        },
+        {
+          "id": "activate-pmem-55-1",
+          "sensitive": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": false
+        },
+        {
+          "id": "activate-pmem-55-2",
+          "sensitive": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": false
+        }
+      ]
+    },
+    "dream": {
+      "caseCount": 1,
+      "discoveryRate": 0,
+      "genuineRate": 0,
+      "crossDomainRate": 0,
+      "hallucinationRate": 0,
+      "cases": [
+        {
+          "id": "dream-pmem-549",
+          "foundRuns": 0,
+          "totalInsights": 0,
+          "discoveryRate": 0,
+          "genuineRate": 0,
+          "crossDomainRate": 0,
+          "hallucinationRate": 0
+        }
+      ]
+    },
+    "implicit": {
+      "caseCount": 3,
+      "detectionRate": 1,
+      "inferenceQuality": 1,
+      "cases": [
+        {
+          "id": "implicit-pmem-55-0",
+          "detected": true,
+          "score": 4
+        },
+        {
+          "id": "implicit-pmem-55-1",
+          "detected": true,
+          "score": 3
+        },
+        {
+          "id": "implicit-pmem-55-2",
+          "detected": true,
+          "score": 4
+        }
+      ]
+    },
+    "personality": {
+      "caseCount": 3,
+      "validCases": 3,
+      "meanCorrelation": 0.15175477333280776,
+      "traitsAbove025": 3,
+      "bestTrait": {
+        "trait": "agreeableness",
+        "correlation": 0.993221486333814
+      },
+      "correlations": {
+        "openness": 0.4492518698068122,
+        "conscientiousness": 0.8846153846153848,
+        "extraversion": -0.6234036915689042,
+        "agreeableness": 0.993221486333814,
+        "neuroticism": -0.9449111825230682
+      },
+      "cases": [
+        {
+          "id": "personality-pandora-pandora-419",
+          "predicted": {
+            "openness": 80,
+            "conscientiousness": 50,
+            "extraversion": 50,
+            "agreeableness": 50,
+            "neuroticism": 50
+          }
+        },
+        {
+          "id": "personality-pandora-pandora-86",
+          "predicted": {
+            "openness": 60,
+            "conscientiousness": 70,
+            "extraversion": 65,
+            "agreeableness": 80,
+            "neuroticism": 40
+          }
+        },
+        {
+          "id": "personality-pandora-pandora-1009",
+          "predicted": {
+            "openness": 60,
+            "conscientiousness": 50,
+            "extraversion": 50,
+            "agreeableness": 70,
+            "neuroticism": 40
+          }
+        }
+      ]
+    }
+  }
+}

@@ -33,7 +33,7 @@ CRITICAL RULES:
 - BE SPECIFIC. "forages for wild mushrooms in forests" >> "enjoys nature"
 - "has a past knee injury from steep hiking terrain" >> "approaches health proactively"
 - Every node should make this person DISTINGUISHABLE from others
-- Extract 5-15 nodes per conversation chunk. More specific = better.
+- Extract 10-20 nodes per conversation chunk. More specific = better. Err on the side of MORE observations — it's better to have too many than too few.
 
 Return a compact JSON object:
 {
