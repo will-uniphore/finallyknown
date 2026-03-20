@@ -1,0 +1,81 @@
+{
+  "generatedAt": "2026-03-20T03:16:56.540Z",
+  "goldenPath": "/Users/ldxstc/personal/known/eval/golden-eval.json",
+  "metricsPath": "/Users/ldxstc/personal/known/eval/METRICS.md",
+  "options": {
+    "goldenPath": "eval/golden-eval.json",
+    "test": "encode",
+    "limit": 3
+  },
+  "scorecard": [
+    {
+      "test": "ENCODE",
+      "metric": "Recall",
+      "value": "75.5%",
+      "target": "> 70% / fail < 50%",
+      "status": "PASS"
+    },
+    {
+      "test": "ENCODE",
+      "metric": "Precision",
+      "value": "50.3%",
+      "target": "> 50% / fail < 30%",
+      "status": "PASS"
+    },
+    {
+      "test": "ENCODE",
+      "metric": "F1",
+      "value": "0.604",
+      "target": "> 0.58 / fail < 0.40",
+      "status": "PASS"
+    },
+    {
+      "test": "ENCODE",
+      "metric": "Hallucination",
+      "value": "10.1%",
+      "target": "< 10% / fail > 20%",
+      "status": "WARN"
+    }
+  ],
+  "knownScore": {
+    "score": 0.6036436146107134,
+    "emoji": "🟢",
+    "partial": true,
+    "weightSum": 0.3
+  },
+  "results": {
+    "encode": {
+      "caseCount": 3,
+      "recall": 0.7551020408163265,
+      "precision": 0.5027932960893855,
+      "f1": 0.6036436146107134,
+      "hallucinationRate": 0.1005586592178771,
+      "cases": [
+        {
+          "id": "encode-pmem-55",
+          "nodeCount": 51,
+          "recall": 0.5454545454545454,
+          "precision": 0.3137254901960784,
+          "f1": 0.3983402489626556,
+          "hallucinationRate": 0.1568627450980392
+        },
+        {
+          "id": "encode-pmem-549",
+          "nodeCount": 64,
+          "recall": 0.65,
+          "precision": 0.15625,
+          "f1": 0.25193798449612403,
+          "hallucinationRate": 0.15625
+        },
+        {
+          "id": "encode-pmem-408",
+          "nodeCount": 64,
+          "recall": 1,
+          "precision": 1,
+          "f1": 1,
+          "hallucinationRate": 0
+        }
+      ]
+    }
+  }
+}

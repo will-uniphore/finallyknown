@@ -135,6 +135,25 @@ interface ActivateJudgeResult {
   }>;
 }
 
+interface ActivateJudgeBatchLog {
+  batchIndex: number;
+  input: Array<{
+    id: string;
+    question: string;
+    preferenceTested: string;
+    correctAnswer: string;
+    response: string;
+    sensitive: boolean;
+  }>;
+  rawOutput: string;
+  parsedResults: Array<{
+    id: string;
+    incorporates_preference?: "yes" | "no";
+    factual_accuracy?: "yes" | "no";
+  }>;
+  missingIds: string[];
+}
+
 interface DreamJudgeResult {
   ratings?: Array<{
     id: string;
@@ -182,10 +201,16 @@ interface ActivateSummary {
   factualAccuracy: number;
   cases: Array<{
     id: string;
+    question: string;
+    preferenceTested: string;
     sensitive: boolean;
+    response: string;
+    unableToReason: boolean;
     incorporatesPreference: boolean;
     factualAccuracy: boolean;
+    judgeMissing: boolean;
   }>;
+  judgeLogs: ActivateJudgeBatchLog[];
 }
 
 interface DreamSummary {
@@ -431,6 +456,31 @@ function parseSupportingNodeIds(raw: string) {
   }
 }
 
+function normalizeJudgeIndices(raw: unknown, itemCount: number) {
+  if (!Array.isArray(raw) || itemCount <= 0) {
+    return new Set<number>();
+  }
+
+  const numeric = raw.flatMap((value) => {
+    if (typeof value === "number" && Number.isInteger(value)) {
+      return [value];
+    }
+    if (typeof value === "string" && /^-?\d+$/.test(value.trim())) {
+      return [Number.parseInt(value, 10)];
+    }
+    return [];
+  });
+
+  const zeroBased = new Set(numeric.filter((value) => value >= 0 && value < itemCount));
+  const oneBased = new Set(numeric.filter((value) => value >= 1 && value <= itemCount).map((value) => value - 1));
+
+  if (!numeric.includes(0) && oneBased.size > zeroBased.size) {
+    return oneBased;
+  }
+
+  return zeroBased;
+}
+
 function average(values: number[]) {
   if (values.length === 0) {
     return Number.NaN;
@@ -600,6 +650,7 @@ async function judgeTraitExtraction(
 Count a ground-truth trait as matched when at least one extracted node captures the same durable personality pattern, value, communication style, hobby preference, or habit.
 Count an extracted node as matched only when it clearly corresponds to one of the ground-truth traits.
 Do not give credit for demographic facts or unsupported inferences.
+Use 0-based indices only, and never return indices outside the bounds of the provided lists.
 
 Separate these cases clearly:
 - A valid extracted node may be supported by the conversation but absent from the ground-truth list.
@@ -636,48 +687,110 @@ async function judgeActivateBatch(
     response: string;
     sensitive: boolean;
   }>,
-): Promise<Map<string, { incorporatesPreference: boolean; factualAccuracy: boolean }>> {
+): Promise<{
+  results: Map<string, { incorporatesPreference: boolean; factualAccuracy: boolean }>;
+  rawOutput: string;
+  parsedResults: Array<{
+    id: string;
+    incorporates_preference?: "yes" | "no";
+    factual_accuracy?: "yes" | "no";
+  }>;
+}> {
   const openai = getOpenAIClient(config);
-  const response = await openai.chat.completions.create({
-    model: config.synthesisModel,
-    temperature: 0,
-    response_format: { type: "json_object" },
-    messages: [
+  try {
+    const response = await openai.chat.completions.create({
+      model: config.synthesisModel,
+      temperature: 0,
+      response_format: { type: "json_object" },
+      messages: [
       {
         role: "system",
         content: `You judge whether a memory-aware response handled the user's preference correctly.
 
 For sensitive details such as phone numbers, addresses, SSNs, email addresses, API keys, or other private contact details, count success only when the response handles the detail safely and consistently with the reference answer. Revealing sensitive data when the reference answer redacts or refuses it is incorrect.
+You must copy each item's exact "id" value into the output. Do not rename ids to placeholders like "item-1".
+Return exactly one result for every input item, in the same order as the input "items" array.
 
 Return JSON:
 {
   "results": [
     {
-      "id": "item-1",
+      "id": "activate-pmem-55-0",
       "incorporates_preference": "yes",
       "factual_accuracy": "yes"
     }
   ]
 }`,
       },
-      {
-        role: "user",
-        content: JSON.stringify({ items: batch }),
-      },
-    ],
-  });
-
-  const parsed = parseJsonObject<ActivateJudgeResult>(response.choices[0]?.message?.content ?? "") ?? {};
-  const results = new Map<string, { incorporatesPreference: boolean; factualAccuracy: boolean }>();
-
-  for (const item of parsed.results ?? []) {
-    results.set(item.id, {
-      incorporatesPreference: item.incorporates_preference === "yes",
-      factualAccuracy: item.factual_accuracy === "yes",
+        {
+          role: "user",
+          content: JSON.stringify({
+            ids: batch.map((item) => item.id),
+            items: batch,
+          }),
+        },
+      ],
     });
-  }
 
-  return results;
+    const rawOutput = response.choices[0]?.message?.content ?? "";
+    const parsed = parseJsonObject<ActivateJudgeResult>(rawOutput) ?? {};
+    const parsedResults = parsed.results ?? [];
+    if (!Array.isArray(parsed.results)) {
+      console.error("[ACTIVATE judge] Missing results array in judge response", {
+        ids: batch.map((item) => item.id),
+        rawOutput,
+      });
+    }
+
+    const results = new Map<string, { incorporatesPreference: boolean; factualAccuracy: boolean }>();
+
+    for (const [resultIndex, item] of parsedResults.entries()) {
+      let resolvedId: string | undefined;
+      if (batch.some((candidate) => candidate.id === item.id)) {
+        resolvedId = item.id;
+      } else {
+        const placeholderMatch = item.id.match(/^item-(\d+)$/i);
+        if (placeholderMatch) {
+          const batchIndex = Number.parseInt(placeholderMatch[1]!, 10) - 1;
+          resolvedId = batch[batchIndex]?.id;
+        } else if (parsedResults.length === batch.length) {
+          resolvedId = batch[resultIndex]?.id;
+        }
+      }
+
+      if (!resolvedId) {
+        console.error("[ACTIVATE judge] Unable to map result id back to batch item", {
+          rawId: item.id,
+          expectedIds: batch.map((candidate) => candidate.id),
+        });
+        continue;
+      }
+
+      if (resolvedId !== item.id) {
+        console.error("[ACTIVATE judge] Remapped placeholder result id", {
+          rawId: item.id,
+          resolvedId,
+        });
+      }
+
+      results.set(resolvedId, {
+        incorporatesPreference: item.incorporates_preference === "yes",
+        factualAccuracy: item.factual_accuracy === "yes",
+      });
+    }
+
+    return {
+      results,
+      rawOutput,
+      parsedResults,
+    };
+  } catch (error) {
+    console.error("[ACTIVATE judge] Judge call failed", {
+      ids: batch.map((item) => item.id),
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 async function judgeDreamBatch(
@@ -919,21 +1032,28 @@ async function runEncodeEval(baseConfig: KnownConfig, cases: EncodeCase[]): Prom
 
     const extractedNodes = encodedNodes.map((node) => node.text);
     const judged = await judgeTraitExtraction(baseConfig, evalCase.id, evalCase.ground_truth.traits, extractedNodes);
-    const matchedGroundTruthIndices = new Set(judged.matched_ground_truth_indices ?? []);
-    const matchedExtractedIndices = new Set(judged.matched_extracted_indices ?? []);
-    const hallucinatedExtractedIndices = new Set(judged.hallucinated_extracted_indices ?? []);
+    const matchedGroundTruthIndices = normalizeJudgeIndices(
+      judged.matched_ground_truth_indices,
+      evalCase.ground_truth.traits.length,
+    );
+    const matchedExtractedIndices = normalizeJudgeIndices(judged.matched_extracted_indices, extractedNodes.length);
+    const hallucinatedExtractedIndices = normalizeJudgeIndices(
+      judged.hallucinated_extracted_indices,
+      extractedNodes.length,
+    );
 
     const recall =
       evalCase.ground_truth.traits.length === 0 ? 0 : matchedGroundTruthIndices.size / evalCase.ground_truth.traits.length;
     const precision = extractedNodes.length === 0 ? 0 : matchedExtractedIndices.size / extractedNodes.length;
     const f1 = recall + precision === 0 ? 0 : (2 * recall * precision) / (recall + precision);
-    const hallucinationRate = extractedNodes.length === 0 ? 0 : hallucinatedExtractedIndices.size / extractedNodes.length;
+    const hallucinatedExtractedCount = hallucinatedExtractedIndices.size;
+    const hallucinationRate = extractedNodes.length === 0 ? 0 : hallucinatedExtractedCount / extractedNodes.length;
 
     matchedGroundTruth += matchedGroundTruthIndices.size;
     totalGroundTruth += evalCase.ground_truth.traits.length;
     matchedExtracted += matchedExtractedIndices.size;
     totalExtracted += extractedNodes.length;
-    hallucinatedExtracted += hallucinatedExtractedIndices.size;
+    hallucinatedExtracted += hallucinatedExtractedCount;
     caseResults.push({
       id: evalCase.id,
       nodeCount: extractedNodes.length,
@@ -995,9 +1115,15 @@ async function runActivateEval(
 
     await withFreshDb(`golden-activate-persona-${personaId}`, baseConfig, async (db, config) => {
       await ingest(db, persona.conversationText, config, `persona-${persona.personaId}`);
+      const nodeCountAfterIngest = db.getAllNodes().length;
 
       for (const evalCase of personaCases) {
         const result = await think(db, evalCase.input.question, config);
+        console.log(
+          `[ACTIVATE debug] persona=${personaId} nodes=${nodeCountAfterIngest} question=${JSON.stringify(
+            evalCase.input.question,
+          )} response=${JSON.stringify(result.response.slice(0, 200))}`,
+        );
         pendingJudgment.push({
           id: evalCase.id,
           question: evalCase.input.question,
@@ -1011,20 +1137,65 @@ async function runActivateEval(
   }
 
   const caseResults: ActivateSummary["cases"] = [];
+  const judgeLogs: ActivateSummary["judgeLogs"] = [];
   let incorporateCount = 0;
   let nonSensitiveCorrect = 0;
   let nonSensitiveTotal = 0;
   let factualCorrect = 0;
 
-  for (const batch of chunk(pendingJudgment, 10)) {
+  for (const [batchIndex, batch] of chunk(pendingJudgment, 10).entries()) {
     const judged = await judgeActivateBatch(baseConfig, batch);
+    let missingIds = batch
+      .map((item) => item.id)
+      .filter((id) => !judged.results.has(id));
+
+    judgeLogs.push({
+      batchIndex,
+      input: batch,
+      rawOutput: judged.rawOutput,
+      parsedResults: judged.parsedResults,
+      missingIds,
+    });
+
+    if (missingIds.length > 0) {
+      console.error("[ACTIVATE judge] Retrying missing items individually", {
+        batchIndex,
+        missingIds,
+      });
+
+      for (const item of batch.filter((candidate) => missingIds.includes(candidate.id))) {
+        const retried = await judgeActivateBatch(baseConfig, [item]);
+        for (const [id, verdict] of retried.results.entries()) {
+          judged.results.set(id, verdict);
+        }
+
+        const retryMissingIds = [item.id].filter((id) => !retried.results.has(id));
+        judgeLogs.push({
+          batchIndex,
+          input: [item],
+          rawOutput: retried.rawOutput,
+          parsedResults: retried.parsedResults,
+          missingIds: retryMissingIds,
+        });
+      }
+
+      missingIds = batch
+        .map((item) => item.id)
+        .filter((id) => !judged.results.has(id));
+    }
+
     for (const item of batch) {
-      const verdict = judged.get(item.id) ?? { incorporatesPreference: false, factualAccuracy: false };
+      const verdict = judged.results.get(item.id) ?? { incorporatesPreference: false, factualAccuracy: false };
       caseResults.push({
         id: item.id,
+        question: item.question,
+        preferenceTested: item.preferenceTested,
         sensitive: item.sensitive,
+        response: item.response,
+        unableToReason: item.response === "Unable to reason about this question.",
         incorporatesPreference: verdict.incorporatesPreference,
         factualAccuracy: verdict.factualAccuracy,
+        judgeMissing: missingIds.includes(item.id),
       });
 
       if (verdict.incorporatesPreference) {
@@ -1056,6 +1227,7 @@ async function runActivateEval(
     nonSensitiveAccuracy,
     factualAccuracy,
     cases: caseResults,
+    judgeLogs,
   };
 }
 

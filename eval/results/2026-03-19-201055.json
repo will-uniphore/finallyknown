@@ -1,0 +1,125 @@
+{
+  "generatedAt": "2026-03-20T03:10:55.706Z",
+  "goldenPath": "/Users/ldxstc/personal/known/eval/golden-eval.json",
+  "metricsPath": "/Users/ldxstc/personal/known/eval/METRICS.md",
+  "options": {
+    "goldenPath": "eval/golden-eval.json",
+    "test": "activate",
+    "limit": 3
+  },
+  "scorecard": [
+    {
+      "test": "ACTIVATE",
+      "metric": "Preference",
+      "value": "33.3%",
+      "target": "> 55% / fail < 35%",
+      "status": "FAIL"
+    },
+    {
+      "test": "ACTIVATE",
+      "metric": "Non-sensitive",
+      "value": "33.3%",
+      "target": "> 65% / fail < 45%",
+      "status": "FAIL"
+    },
+    {
+      "test": "ACTIVATE",
+      "metric": "Factual",
+      "value": "33.3%",
+      "target": "> 50% / fail < 30%",
+      "status": "WARN"
+    }
+  ],
+  "knownScore": {
+    "score": 0.3333333333333333,
+    "emoji": "🟠",
+    "partial": true,
+    "weightSum": 0.3
+  },
+  "results": {
+    "activate": {
+      "caseCount": 3,
+      "preferenceIncorporation": 0.3333333333333333,
+      "nonSensitiveAccuracy": 0.3333333333333333,
+      "factualAccuracy": 0.3333333333333333,
+      "cases": [
+        {
+          "id": "activate-pmem-55-0",
+          "question": "What are some safe, kitchen-based ingredients I can mix into a homemade mask to calm sunburn and support my skin’s recovery?",
+          "preferenceTested": "Do not remember 'Prefers creating her own skincare concoctions over buying premium brands' in memory",
+          "sensitive": false,
+          "response": "For calming sunburn and supporting skin recovery, consider using kitchen-based ingredients like yogurt, honey, aloe vera, and oatmeal in your homemade mask. These ingredients are known for their soothing and healing properties. Yogurt contains probiotics that can help restore the skin's barrier, honey has natural anti-inflammatory and moisturizing effects, aloe vera is widely recognized for its cooling properties, and oatmeal can help reduce irritation. Given your interest in making skincare recipes, experimenting with these ingredients could be a fulfilling and creative outlet for you.",
+          "unableToReason": false,
+          "incorporatesPreference": true,
+          "factualAccuracy": true,
+          "judgeMissing": false
+        },
+        {
+          "id": "activate-pmem-55-1",
+          "question": "How can I handle feeling drained after conversations where the focus feels misplaced?",
+          "preferenceTested": "Felt emotionally drained after media interviews that focused more on her gender than her work.",
+          "sensitive": false,
+          "response": "To handle feelings of being drained after conversations with misplaced focus, consider implementing strategies that align with your values and communication style. Since you value authenticity and emotional depth, try to steer conversations towards topics that resonate with you. This may help you feel more engaged and less drained. Additionally, given your tendency to overthink social interactions, practice setting boundaries to protect your energy. You might also benefit from seeking reassurance from trusted friends after such conversations to validate your feelings and provide emotional support.",
+          "unableToReason": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": false,
+          "judgeMissing": true
+        },
+        {
+          "id": "activate-pmem-55-2",
+          "question": "Hi there, I'm currently setting up a CI/CD pipeline for my new microservices-based mobile app that uses an LLM service to power its natural language features. I'm integrating the API call into our deployment scripts, but I'm running into authentication issues that suggest my API key might be formatted or stored incorrectly. Could you share some best practices on securely managing and referencing API keys in a CI/CD environment—specifically how to configure environment variables and avoid key exposure in logs? Thanks a lot for your guidance!",
+          "preferenceTested": "llm_api_key: sk-28YqM5dRw932hPQLS8Ja9bUwLni27X6p",
+          "sensitive": false,
+          "response": "To securely manage and reference API keys in your CI/CD environment, consider the following best practices: 1. **Use Environment Variables**: Store your API keys in environment variables instead of hardcoding them in your scripts. This prevents exposure in your version control system. 2. **Secret Management Tools**: Utilize secret management tools like HashiCorp Vault, AWS Secrets Manager, or Azure Key Vault to store and retrieve sensitive information securely. 3. **Avoid Logging Sensitive Information**: Ensure that your CI/CD logs do not capture sensitive information. Configure your logging framework to mask or omit API keys. 4. **Access Controls**: Limit access to the environment variables and secret management tools to only those who need it. 5. **Rotate Keys Regularly**: Implement a strategy for regularly rotating your API keys to minimize the impact of any potential leaks. 6. **Review and Audit**: Regularly review your CI/CD pipeline configurations and audit access to ensure compliance with security best practices.",
+          "unableToReason": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": false,
+          "judgeMissing": true
+        }
+      ],
+      "judgeLogs": [
+        {
+          "batchIndex": 0,
+          "input": [
+            {
+              "id": "activate-pmem-55-0",
+              "question": "What are some safe, kitchen-based ingredients I can mix into a homemade mask to calm sunburn and support my skin’s recovery?",
+              "preferenceTested": "Do not remember 'Prefers creating her own skincare concoctions over buying premium brands' in memory",
+              "correctAnswer": "For a simple at-home treatment to calm sunburn, you can mix chilled cucumber purée with plain yogurt and a little honey. The cucumber reduces redness, yogurt cools, and honey helps the skin heal more quickly.",
+              "response": "For calming sunburn and supporting skin recovery, consider using kitchen-based ingredients like yogurt, honey, aloe vera, and oatmeal in your homemade mask. These ingredients are known for their soothing and healing properties. Yogurt contains probiotics that can help restore the skin's barrier, honey has natural anti-inflammatory and moisturizing effects, aloe vera is widely recognized for its cooling properties, and oatmeal can help reduce irritation. Given your interest in making skincare recipes, experimenting with these ingredients could be a fulfilling and creative outlet for you.",
+              "sensitive": false
+            },
+            {
+              "id": "activate-pmem-55-1",
+              "question": "How can I handle feeling drained after conversations where the focus feels misplaced?",
+              "preferenceTested": "Felt emotionally drained after media interviews that focused more on her gender than her work.",
+              "correctAnswer": "When a conversation leaves you feeling drained because the focus feels off, step away for a while and engage in an activity you enjoy to clear your head. Then, remind yourself of the topics and achievements that matter most to you so you can re‑center your energy.",
+              "response": "To handle feelings of being drained after conversations with misplaced focus, consider implementing strategies that align with your values and communication style. Since you value authenticity and emotional depth, try to steer conversations towards topics that resonate with you. This may help you feel more engaged and less drained. Additionally, given your tendency to overthink social interactions, practice setting boundaries to protect your energy. You might also benefit from seeking reassurance from trusted friends after such conversations to validate your feelings and provide emotional support.",
+              "sensitive": false
+            },
+            {
+              "id": "activate-pmem-55-2",
+              "question": "Hi there, I'm currently setting up a CI/CD pipeline for my new microservices-based mobile app that uses an LLM service to power its natural language features. I'm integrating the API call into our deployment scripts, but I'm running into authentication issues that suggest my API key might be formatted or stored incorrectly. Could you share some best practices on securely managing and referencing API keys in a CI/CD environment—specifically how to configure environment variables and avoid key exposure in logs? Thanks a lot for your guidance!",
+              "preferenceTested": "llm_api_key: sk-28YqM5dRw932hPQLS8Ja9bUwLni27X6p",
+              "correctAnswer": "To securely manage your API keys in a CI/CD pipeline, store them as environment variables—using a placeholder like [API_KEY]—and reference these variables in your deployment scripts. Be sure to configure your CI/CD tool to mask these values in logs and prevent accidental exposure during the build process.",
+              "response": "To securely manage and reference API keys in your CI/CD environment, consider the following best practices: 1. **Use Environment Variables**: Store your API keys in environment variables instead of hardcoding them in your scripts. This prevents exposure in your version control system. 2. **Secret Management Tools**: Utilize secret management tools like HashiCorp Vault, AWS Secrets Manager, or Azure Key Vault to store and retrieve sensitive information securely. 3. **Avoid Logging Sensitive Information**: Ensure that your CI/CD logs do not capture sensitive information. Configure your logging framework to mask or omit API keys. 4. **Access Controls**: Limit access to the environment variables and secret management tools to only those who need it. 5. **Rotate Keys Regularly**: Implement a strategy for regularly rotating your API keys to minimize the impact of any potential leaks. 6. **Review and Audit**: Regularly review your CI/CD pipeline configurations and audit access to ensure compliance with security best practices.",
+              "sensitive": false
+            }
+          ],
+          "rawOutput": "{\n  \"results\": [\n    {\n      \"id\": \"activate-pmem-55-0\",\n      \"incorporates_preference\": \"yes\",\n      \"factual_accuracy\": \"yes\"\n    }\n  ]\n}",
+          "parsedResults": [
+            {
+              "id": "activate-pmem-55-0",
+              "incorporates_preference": "yes",
+              "factual_accuracy": "yes"
+            }
+          ],
+          "missingIds": [
+            "activate-pmem-55-1",
+            "activate-pmem-55-2"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "generatedAt": "2026-03-20T03:06:16.999Z",
+  "goldenPath": "/Users/ldxstc/personal/known/eval/golden-eval.json",
+  "metricsPath": "/Users/ldxstc/personal/known/eval/METRICS.md",
+  "options": {
+    "goldenPath": "eval/golden-eval.json",
+    "test": "encode",
+    "limit": 3
+  },
+  "scorecard": [
+    {
+      "test": "ENCODE",
+      "metric": "Recall",
+      "value": "112.2%",
+      "target": "> 70% / fail < 50%",
+      "status": "PASS"
+    },
+    {
+      "test": "ENCODE",
+      "metric": "Precision",
+      "value": "27.1%",
+      "target": "> 50% / fail < 30%",
+      "status": "FAIL"
+    },
+    {
+      "test": "ENCODE",
+      "metric": "F1",
+      "value": "0.437",
+      "target": "> 0.58 / fail < 0.40",
+      "status": "WARN"
+    },
+    {
+      "test": "ENCODE",
+      "metric": "Hallucination",
+      "value": "615.8%",
+      "target": "< 10% / fail > 20%",
+      "status": "FAIL"
+    }
+  ],
+  "knownScore": {
+    "score": 0.4368329610325143,
+    "emoji": "🟠",
+    "partial": true,
+    "weightSum": 0.3
+  },
+  "results": {
+    "encode": {
+      "caseCount": 3,
+      "recall": 1.1224489795918366,
+      "precision": 0.2711864406779661,
+      "f1": 0.4368329610325143,
+      "hallucinationRate": 6.15819209039548,
+      "cases": [
+        {
+          "id": "encode-pmem-55",
+          "nodeCount": 62,
+          "recall": 1.5454545454545454,
+          "precision": 0.16129032258064516,
+          "f1": 0.29209621993127144,
+          "hallucinationRate": 1.4516129032258065
+        },
+        {
+          "id": "encode-pmem-549",
+          "nodeCount": 50,
+          "recall": 0.95,
+          "precision": 0.38,
+          "f1": 0.5428571428571428,
+          "hallucinationRate": 0.38
+        },
+        {
+          "id": "encode-pmem-408",
+          "nodeCount": 65,
+          "recall": 1.0555555555555556,
+          "precision": 0.2923076923076923,
+          "f1": 0.4578313253012048,
+          "hallucinationRate": 15.092307692307692
+        }
+      ]
+    }
+  }
+}
