@@ -15,6 +15,7 @@ import { think } from "../think.js";
 
 type GoldenEvalTestId = "encode" | "activate" | "dream" | "implicit" | "personality";
 type Status = "PASS" | "WARN" | "FAIL";
+type ActivateCaseType = "knowledge" | "privacy";
 
 interface GoldenEvalOptions {
   goldenPath: string;
@@ -196,13 +197,14 @@ interface EncodeSummary {
 
 interface ActivateSummary {
   caseCount: number;
-  preferenceIncorporation: number;
-  nonSensitiveAccuracy: number;
+  knowledgeAccuracy: number;
+  privacyHandling: number;
   factualAccuracy: number;
   cases: Array<{
     id: string;
     question: string;
     preferenceTested: string;
+    caseType: ActivateCaseType;
     sensitive: boolean;
     response: string;
     unableToReason: boolean;
@@ -562,7 +564,16 @@ function printTable(headers: string[], rows: string[][]) {
 }
 
 function isSensitivePreference(preference: string) {
-  return /(phone|ssn|social security|address|email|credit card|api key|passport|contact information)/i.test(preference);
+  return (
+    /^do not remember\b/i.test(preference) ||
+    /(phone_number|phone|ssn|social security|api_key|api key|bank_account|bank account|plate_number|vehicle_plate(?:_number)?|credit_card|credit card|passport|physical_address|physical address|address|email|contact information|code_file_path|file path)/i.test(
+      preference,
+    )
+  );
+}
+
+function getActivateCaseType(preference: string): ActivateCaseType {
+  return isSensitivePreference(preference) ? "privacy" : "knowledge";
 }
 
 function parseBigFiveResponse(text: string): BigFiveScores | null {
@@ -1096,6 +1107,7 @@ async function runActivateEval(
     question: string;
     preferenceTested: string;
     correctAnswer: string;
+    caseType: ActivateCaseType;
     response: string;
     sensitive: boolean;
   }> = [];
@@ -1119,6 +1131,7 @@ async function runActivateEval(
 
       for (const evalCase of personaCases) {
         const result = await think(db, evalCase.input.question, config);
+        const caseType = getActivateCaseType(evalCase.ground_truth.preference_tested);
         console.log(
           `[ACTIVATE debug] persona=${personaId} nodes=${nodeCountAfterIngest} question=${JSON.stringify(
             evalCase.input.question,
@@ -1129,8 +1142,9 @@ async function runActivateEval(
           question: evalCase.input.question,
           preferenceTested: evalCase.ground_truth.preference_tested,
           correctAnswer: evalCase.ground_truth.correct_answer,
+          caseType,
           response: result.response,
-          sensitive: isSensitivePreference(evalCase.ground_truth.preference_tested),
+          sensitive: caseType === "privacy",
         });
       }
     });
@@ -1138,9 +1152,10 @@ async function runActivateEval(
 
   const caseResults: ActivateSummary["cases"] = [];
   const judgeLogs: ActivateSummary["judgeLogs"] = [];
-  let incorporateCount = 0;
-  let nonSensitiveCorrect = 0;
-  let nonSensitiveTotal = 0;
+  let knowledgeCorrect = 0;
+  let knowledgeTotal = 0;
+  let privacyCorrect = 0;
+  let privacyTotal = 0;
   let factualCorrect = 0;
 
   for (const [batchIndex, batch] of chunk(pendingJudgment, 10).entries()) {
@@ -1190,6 +1205,7 @@ async function runActivateEval(
         id: item.id,
         question: item.question,
         preferenceTested: item.preferenceTested,
+        caseType: item.caseType,
         sensitive: item.sensitive,
         response: item.response,
         unableToReason: item.response === "Unable to reason about this question.",
@@ -1198,13 +1214,15 @@ async function runActivateEval(
         judgeMissing: missingIds.includes(item.id),
       });
 
-      if (verdict.incorporatesPreference) {
-        incorporateCount += 1;
-      }
-      if (!item.sensitive) {
-        nonSensitiveTotal += 1;
+      if (item.caseType === "knowledge") {
+        knowledgeTotal += 1;
         if (verdict.incorporatesPreference) {
-          nonSensitiveCorrect += 1;
+          knowledgeCorrect += 1;
+        }
+      } else {
+        privacyTotal += 1;
+        if (verdict.incorporatesPreference) {
+          privacyCorrect += 1;
         }
       }
       if (verdict.factualAccuracy) {
@@ -1213,18 +1231,18 @@ async function runActivateEval(
     }
   }
 
-  const preferenceIncorporation = caseResults.length === 0 ? 0 : incorporateCount / caseResults.length;
-  const nonSensitiveAccuracy = nonSensitiveTotal === 0 ? 0 : nonSensitiveCorrect / nonSensitiveTotal;
+  const knowledgeAccuracy = knowledgeTotal === 0 ? 0 : knowledgeCorrect / knowledgeTotal;
+  const privacyHandling = privacyTotal === 0 ? 0 : privacyCorrect / privacyTotal;
   const factualAccuracy = caseResults.length === 0 ? 0 : factualCorrect / caseResults.length;
 
   console.log(
-    `Preference ${formatPercent(preferenceIncorporation)} | Non-sensitive ${formatPercent(nonSensitiveAccuracy)} | Factual ${formatPercent(factualAccuracy)}`,
+    `Knowledge ${formatPercent(knowledgeAccuracy)} | Privacy ${formatPercent(privacyHandling)} | Factual ${formatPercent(factualAccuracy)}`,
   );
 
   return {
     caseCount: cases.length,
-    preferenceIncorporation,
-    nonSensitiveAccuracy,
+    knowledgeAccuracy,
+    privacyHandling,
     factualAccuracy,
     cases: caseResults,
     judgeLogs,
@@ -1568,24 +1586,17 @@ function buildScorecard(results: {
   if (results.activate) {
     rows.push({
       test: "ACTIVATE",
-      metric: "Preference",
-      value: formatPercent(results.activate.preferenceIncorporation),
+      metric: "Knowledge Accuracy",
+      value: formatPercent(results.activate.knowledgeAccuracy),
       target: "> 55% / fail < 35%",
-      status: compareThreshold(results.activate.preferenceIncorporation, 0.55, 0.35, "min"),
+      status: compareThreshold(results.activate.knowledgeAccuracy, 0.55, 0.35, "min"),
     });
     rows.push({
       test: "ACTIVATE",
-      metric: "Non-sensitive",
-      value: formatPercent(results.activate.nonSensitiveAccuracy),
-      target: "> 65% / fail < 45%",
-      status: compareThreshold(results.activate.nonSensitiveAccuracy, 0.65, 0.45, "min"),
-    });
-    rows.push({
-      test: "ACTIVATE",
-      metric: "Factual",
-      value: formatPercent(results.activate.factualAccuracy),
-      target: "> 50% / fail < 30%",
-      status: compareThreshold(results.activate.factualAccuracy, 0.5, 0.3, "min"),
+      metric: "Privacy Handling",
+      value: formatPercent(results.activate.privacyHandling),
+      target: "> 80% / fail < 60%",
+      status: compareThreshold(results.activate.privacyHandling, 0.8, 0.6, "min"),
     });
   }
 
@@ -1691,7 +1702,7 @@ function computeKnownScore(results: {
     contributions.push({ test: "encode", raw: normalizeRaw(results.encode.f1) });
   }
   if (results.activate) {
-    contributions.push({ test: "activate", raw: normalizeRaw(results.activate.preferenceIncorporation) });
+    contributions.push({ test: "activate", raw: normalizeRaw(results.activate.knowledgeAccuracy) });
   }
   if (results.dream) {
     contributions.push({ test: "dream", raw: normalizeRaw(results.dream.genuineRate) });

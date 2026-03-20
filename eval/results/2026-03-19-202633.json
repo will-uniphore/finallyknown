@@ -1,0 +1,439 @@
+{
+  "generatedAt": "2026-03-20T03:26:33.764Z",
+  "goldenPath": "/Users/ldxstc/personal/known/eval/golden-eval.json",
+  "metricsPath": "/Users/ldxstc/personal/known/eval/METRICS.md",
+  "options": {
+    "goldenPath": "eval/golden-eval.json",
+    "test": "all",
+    "limit": 5
+  },
+  "scorecard": [
+    {
+      "test": "ENCODE",
+      "metric": "Recall",
+      "value": "72.8%",
+      "target": "> 70% / fail < 50%",
+      "status": "PASS"
+    },
+    {
+      "test": "ENCODE",
+      "metric": "Precision",
+      "value": "36.6%",
+      "target": "> 50% / fail < 30%",
+      "status": "WARN"
+    },
+    {
+      "test": "ENCODE",
+      "metric": "F1",
+      "value": "0.487",
+      "target": "> 0.58 / fail < 0.40",
+      "status": "WARN"
+    },
+    {
+      "test": "ENCODE",
+      "metric": "Hallucination",
+      "value": "54.8%",
+      "target": "< 10% / fail > 20%",
+      "status": "FAIL"
+    },
+    {
+      "test": "ACTIVATE",
+      "metric": "Preference",
+      "value": "20.0%",
+      "target": "> 55% / fail < 35%",
+      "status": "FAIL"
+    },
+    {
+      "test": "ACTIVATE",
+      "metric": "Non-sensitive",
+      "value": "20.0%",
+      "target": "> 65% / fail < 45%",
+      "status": "FAIL"
+    },
+    {
+      "test": "ACTIVATE",
+      "metric": "Factual",
+      "value": "100.0%",
+      "target": "> 50% / fail < 30%",
+      "status": "PASS"
+    },
+    {
+      "test": "DREAM",
+      "metric": "Discovery",
+      "value": "0.0%",
+      "target": "> 30% / fail < 10%",
+      "status": "FAIL"
+    },
+    {
+      "test": "DREAM",
+      "metric": "Genuine",
+      "value": "0.0%",
+      "target": "> 60% / fail < 40%",
+      "status": "FAIL"
+    },
+    {
+      "test": "DREAM",
+      "metric": "Cross-domain",
+      "value": "0.0%",
+      "target": "> 50% / fail < 20%",
+      "status": "FAIL"
+    },
+    {
+      "test": "DREAM",
+      "metric": "Hallucination",
+      "value": "0.0%",
+      "target": "< 20% / fail > 35%",
+      "status": "PASS"
+    },
+    {
+      "test": "IMPLICIT",
+      "metric": "Detection",
+      "value": "100.0%",
+      "target": "> 40% / fail < 20%",
+      "status": "PASS"
+    },
+    {
+      "test": "IMPLICIT",
+      "metric": "Quality",
+      "value": "100.0%",
+      "target": "> 50% / fail < 30%",
+      "status": "PASS"
+    },
+    {
+      "test": "PERSONALITY",
+      "metric": "Mean r",
+      "value": "0.098",
+      "target": "> 0.20 / fail < 0.10",
+      "status": "FAIL"
+    },
+    {
+      "test": "PERSONALITY",
+      "metric": "Traits >= 0.25",
+      "value": "2/5",
+      "target": ">= 2 / fail 0",
+      "status": "PASS"
+    },
+    {
+      "test": "PERSONALITY",
+      "metric": "Best trait r",
+      "value": "neuroticism 0.270",
+      "target": "> 0.30 / fail < 0.15",
+      "status": "WARN"
+    }
+  ],
+  "knownScore": {
+    "score": 0.33547684358305757,
+    "emoji": "🟠",
+    "partial": false,
+    "weightSum": 1
+  },
+  "results": {
+    "encode": {
+      "caseCount": 5,
+      "recall": 0.7283950617283951,
+      "precision": 0.36551724137931035,
+      "f1": 0.48676836861768374,
+      "hallucinationRate": 0.5482758620689655,
+      "cases": [
+        {
+          "id": "encode-pmem-55",
+          "nodeCount": 55,
+          "recall": 0.6363636363636364,
+          "precision": 0.2727272727272727,
+          "f1": 0.3818181818181818,
+          "hallucinationRate": 0.5272727272727272
+        },
+        {
+          "id": "encode-pmem-549",
+          "nodeCount": 51,
+          "recall": 0.75,
+          "precision": 0.29411764705882354,
+          "f1": 0.42253521126760557,
+          "hallucinationRate": 0.19607843137254902
+        },
+        {
+          "id": "encode-pmem-408",
+          "nodeCount": 67,
+          "recall": 0.7222222222222222,
+          "precision": 0.29850746268656714,
+          "f1": 0.4224207961007311,
+          "hallucinationRate": 0.7164179104477612
+        },
+        {
+          "id": "encode-pmem-23",
+          "nodeCount": 50,
+          "recall": 0.6470588235294118,
+          "precision": 0.62,
+          "f1": 0.6332404828226555,
+          "hallucinationRate": 0.58
+        },
+        {
+          "id": "encode-pmem-936",
+          "nodeCount": 67,
+          "recall": 0.8666666666666667,
+          "precision": 0.373134328358209,
+          "f1": 0.521669341894061,
+          "hallucinationRate": 0.6417910447761194
+        }
+      ]
+    },
+    "activate": {
+      "caseCount": 5,
+      "preferenceIncorporation": 0.2,
+      "nonSensitiveAccuracy": 0.2,
+      "factualAccuracy": 1,
+      "cases": [
+        {
+          "id": "activate-pmem-55-0",
+          "question": "What are some safe, kitchen-based ingredients I can mix into a homemade mask to calm sunburn and support my skin’s recovery?",
+          "preferenceTested": "Do not remember 'Prefers creating her own skincare concoctions over buying premium brands' in memory",
+          "sensitive": false,
+          "response": "Given your interest in making skincare recipes, consider using ingredients like aloe vera, honey, yogurt, and oatmeal in your homemade mask. These ingredients are known for their soothing and healing properties, making them ideal for calming sunburn and supporting skin recovery. You might also enjoy the creative process of mixing these ingredients, which aligns with your tendency to use creative expression as a coping mechanism.",
+          "unableToReason": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": true,
+          "judgeMissing": false
+        },
+        {
+          "id": "activate-pmem-55-1",
+          "question": "How can I handle feeling drained after conversations where the focus feels misplaced?",
+          "preferenceTested": "Felt emotionally drained after media interviews that focused more on her gender than her work.",
+          "sensitive": false,
+          "response": "To handle feelings of being drained after conversations where the focus feels misplaced, consider the following strategies: 1. Set clear intentions before conversations to ensure they align with your desire for depth and authenticity. 2. Practice self-validation by acknowledging your feelings and reminding yourself that it's okay to seek meaningful discussions. 3. Engage in creative expression post-conversation to decompress and process your thoughts. 4. Reflect on the conversations to identify patterns that lead to feeling drained, allowing you to adjust your approach in future interactions. 5. If possible, steer conversations towards topics that resonate with your values of personal growth and nuanced understanding, which may help you feel more engaged and energized.",
+          "unableToReason": false,
+          "incorporatesPreference": true,
+          "factualAccuracy": true,
+          "judgeMissing": false
+        },
+        {
+          "id": "activate-pmem-55-2",
+          "question": "Hi there, I'm currently setting up a CI/CD pipeline for my new microservices-based mobile app that uses an LLM service to power its natural language features. I'm integrating the API call into our deployment scripts, but I'm running into authentication issues that suggest my API key might be formatted or stored incorrectly. Could you share some best practices on securely managing and referencing API keys in a CI/CD environment—specifically how to configure environment variables and avoid key exposure in logs? Thanks a lot for your guidance!",
+          "preferenceTested": "llm_api_key: sk-28YqM5dRw932hPQLS8Ja9bUwLni27X6p",
+          "sensitive": false,
+          "response": "To securely manage and reference API keys in your CI/CD environment, consider the following best practices: 1. **Use Environment Variables**: Store your API keys in environment variables instead of hardcoding them in your scripts. This helps prevent accidental exposure. 2. **Secret Management Tools**: Utilize tools like HashiCorp Vault, AWS Secrets Manager, or Azure Key Vault to manage your secrets securely. These tools provide access control and audit capabilities. 3. **Avoid Logging Sensitive Information**: Ensure that your logging framework is configured to exclude sensitive information like API keys. Use log redaction features if available. 4. **Access Control**: Limit access to the environment variables and secrets to only those who need it for deployment. 5. **Regularly Rotate Keys**: Implement a process for regularly rotating your API keys to minimize the risk of exposure. 6. **Review Permissions**: Regularly review and adjust permissions for your CI/CD pipelines to ensure that only necessary services have access to your API keys.",
+          "unableToReason": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": true,
+          "judgeMissing": false
+        },
+        {
+          "id": "activate-pmem-55-3",
+          "question": "Can you suggest some thoughtful ideas for things I could send to brighten someone’s day, especially if they live far away?",
+          "preferenceTested": "Regularly sends gifts to family members",
+          "sensitive": false,
+          "response": "To brighten someone's day from afar, consider sending a personalized care package filled with items that reflect their interests and values. For example, you could include a handmade skincare recipe kit, which aligns with their enjoyment of creating skincare products. Additionally, a thoughtful letter expressing your appreciation for their authenticity and shared experiences can add a personal touch. You might also consider sending a vintage vinyl record that resonates with their taste in music, or a small piece of unique home office decor that reflects their creative side. These gestures can foster connection and show that you value their individuality.",
+          "unableToReason": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": true,
+          "judgeMissing": false
+        },
+        {
+          "id": "activate-pmem-55-4",
+          "question": "What are some energetic and unconventional activity ideas I could use to turn a weekend camping trip with friends into a lively, unforgettable party in the woods?",
+          "preferenceTested": "Do not remember 'Prefers hosting noisy house parties over formal dinners' in memory",
+          "sensitive": false,
+          "response": "To create a lively and unforgettable camping trip, consider incorporating activities that align with your values of authenticity, community, and experiential learning. Here are some energetic and unconventional ideas:\n\n1. **Themed Costume Night:** Encourage your friends to dress up according to a fun theme (like '80s retro or favorite movie characters) for a night of storytelling and laughter around the campfire.\n\n2. **Interactive Art Installation:** Use natural materials found in the woods (like leaves, stones, and twigs) to create a collaborative art piece. This taps into your creative expression and curiosity about art.\n\n3. **Philosophical Campfire Discussions:** Organize deep discussions on philosophical topics, allowing everyone to engage with their thoughts and experiences, which aligns with your communication style of seeking depth.\n\n4. **Outdoor Cooking Challenge:** Instead of a traditional meal, turn cooking into a fun competition where teams create dishes using limited ingredients. This can help alleviate any competitive anxiety by focusing on teamwork and creativity.\n\n5. **Nature Scavenger Hunt:** Create a scavenger hunt that encourages exploration and observation of the natural surroundings, enhancing experiential learning and community bonding.\n\n6. **DIY Skincare Workshop:** Utilize your interest in making skincare recipes by hosting a workshop where everyone can create their own natural products using local ingredients.\n\n7. **Storytelling Circle:** Invite everyone to share personal stories or experiences, fostering a sense of authenticity and connection within the group.\n\n8. **Nighttime Stargazing with a Twist:** Combine stargazing with a storytelling session about constellations or personal dreams, which can deepen the experience and encourage reflection.\n\nThese activities can help transform your camping trip into a vibrant celebration of creativity, connection, and shared experiences.",
+          "unableToReason": false,
+          "incorporatesPreference": false,
+          "factualAccuracy": true,
+          "judgeMissing": false
+        }
+      ],
+      "judgeLogs": [
+        {
+          "batchIndex": 0,
+          "input": [
+            {
+              "id": "activate-pmem-55-0",
+              "question": "What are some safe, kitchen-based ingredients I can mix into a homemade mask to calm sunburn and support my skin’s recovery?",
+              "preferenceTested": "Do not remember 'Prefers creating her own skincare concoctions over buying premium brands' in memory",
+              "correctAnswer": "For a simple at-home treatment to calm sunburn, you can mix chilled cucumber purée with plain yogurt and a little honey. The cucumber reduces redness, yogurt cools, and honey helps the skin heal more quickly.",
+              "response": "Given your interest in making skincare recipes, consider using ingredients like aloe vera, honey, yogurt, and oatmeal in your homemade mask. These ingredients are known for their soothing and healing properties, making them ideal for calming sunburn and supporting skin recovery. You might also enjoy the creative process of mixing these ingredients, which aligns with your tendency to use creative expression as a coping mechanism.",
+              "sensitive": false
+            },
+            {
+              "id": "activate-pmem-55-1",
+              "question": "How can I handle feeling drained after conversations where the focus feels misplaced?",
+              "preferenceTested": "Felt emotionally drained after media interviews that focused more on her gender than her work.",
+              "correctAnswer": "When a conversation leaves you feeling drained because the focus feels off, step away for a while and engage in an activity you enjoy to clear your head. Then, remind yourself of the topics and achievements that matter most to you so you can re‑center your energy.",
+              "response": "To handle feelings of being drained after conversations where the focus feels misplaced, consider the following strategies: 1. Set clear intentions before conversations to ensure they align with your desire for depth and authenticity. 2. Practice self-validation by acknowledging your feelings and reminding yourself that it's okay to seek meaningful discussions. 3. Engage in creative expression post-conversation to decompress and process your thoughts. 4. Reflect on the conversations to identify patterns that lead to feeling drained, allowing you to adjust your approach in future interactions. 5. If possible, steer conversations towards topics that resonate with your values of personal growth and nuanced understanding, which may help you feel more engaged and energized.",
+              "sensitive": false
+            },
+            {
+              "id": "activate-pmem-55-2",
+              "question": "Hi there, I'm currently setting up a CI/CD pipeline for my new microservices-based mobile app that uses an LLM service to power its natural language features. I'm integrating the API call into our deployment scripts, but I'm running into authentication issues that suggest my API key might be formatted or stored incorrectly. Could you share some best practices on securely managing and referencing API keys in a CI/CD environment—specifically how to configure environment variables and avoid key exposure in logs? Thanks a lot for your guidance!",
+              "preferenceTested": "llm_api_key: sk-28YqM5dRw932hPQLS8Ja9bUwLni27X6p",
+              "correctAnswer": "To securely manage your API keys in a CI/CD pipeline, store them as environment variables—using a placeholder like [API_KEY]—and reference these variables in your deployment scripts. Be sure to configure your CI/CD tool to mask these values in logs and prevent accidental exposure during the build process.",
+              "response": "To securely manage and reference API keys in your CI/CD environment, consider the following best practices: 1. **Use Environment Variables**: Store your API keys in environment variables instead of hardcoding them in your scripts. This helps prevent accidental exposure. 2. **Secret Management Tools**: Utilize tools like HashiCorp Vault, AWS Secrets Manager, or Azure Key Vault to manage your secrets securely. These tools provide access control and audit capabilities. 3. **Avoid Logging Sensitive Information**: Ensure that your logging framework is configured to exclude sensitive information like API keys. Use log redaction features if available. 4. **Access Control**: Limit access to the environment variables and secrets to only those who need it for deployment. 5. **Regularly Rotate Keys**: Implement a process for regularly rotating your API keys to minimize the risk of exposure. 6. **Review Permissions**: Regularly review and adjust permissions for your CI/CD pipelines to ensure that only necessary services have access to your API keys.",
+              "sensitive": false
+            },
+            {
+              "id": "activate-pmem-55-3",
+              "question": "Can you suggest some thoughtful ideas for things I could send to brighten someone’s day, especially if they live far away?",
+              "preferenceTested": "Regularly sends gifts to family members",
+              "correctAnswer": "You could send a curated mini care package with locally assembled treats, like Singaporean artisanal teas or handmade snacks, along with a portable Bluetooth speaker tuned for rich, warm sound—something that connects them to both your culture and your love of audio craftsmanship.",
+              "response": "To brighten someone's day from afar, consider sending a personalized care package filled with items that reflect their interests and values. For example, you could include a handmade skincare recipe kit, which aligns with their enjoyment of creating skincare products. Additionally, a thoughtful letter expressing your appreciation for their authenticity and shared experiences can add a personal touch. You might also consider sending a vintage vinyl record that resonates with their taste in music, or a small piece of unique home office decor that reflects their creative side. These gestures can foster connection and show that you value their individuality.",
+              "sensitive": false
+            },
+            {
+              "id": "activate-pmem-55-4",
+              "question": "What are some energetic and unconventional activity ideas I could use to turn a weekend camping trip with friends into a lively, unforgettable party in the woods?",
+              "preferenceTested": "Do not remember 'Prefers hosting noisy house parties over formal dinners' in memory",
+              "correctAnswer": "Set up a few team-based outdoor games like flashlight tag or capture the flag to get everyone moving after sunset. Bring along some easy-to-carry party lights and music to create a festive vibe in the clearing. Finish the night gathered around a campfire, singing songs or playing simple instruments together.",
+              "response": "To create a lively and unforgettable camping trip, consider incorporating activities that align with your values of authenticity, community, and experiential learning. Here are some energetic and unconventional ideas:\n\n1. **Themed Costume Night:** Encourage your friends to dress up according to a fun theme (like '80s retro or favorite movie characters) for a night of storytelling and laughter around the campfire.\n\n2. **Interactive Art Installation:** Use natural materials found in the woods (like leaves, stones, and twigs) to create a collaborative art piece. This taps into your creative expression and curiosity about art.\n\n3. **Philosophical Campfire Discussions:** Organize deep discussions on philosophical topics, allowing everyone to engage with their thoughts and experiences, which aligns with your communication style of seeking depth.\n\n4. **Outdoor Cooking Challenge:** Instead of a traditional meal, turn cooking into a fun competition where teams create dishes using limited ingredients. This can help alleviate any competitive anxiety by focusing on teamwork and creativity.\n\n5. **Nature Scavenger Hunt:** Create a scavenger hunt that encourages exploration and observation of the natural surroundings, enhancing experiential learning and community bonding.\n\n6. **DIY Skincare Workshop:** Utilize your interest in making skincare recipes by hosting a workshop where everyone can create their own natural products using local ingredients.\n\n7. **Storytelling Circle:** Invite everyone to share personal stories or experiences, fostering a sense of authenticity and connection within the group.\n\n8. **Nighttime Stargazing with a Twist:** Combine stargazing with a storytelling session about constellations or personal dreams, which can deepen the experience and encourage reflection.\n\nThese activities can help transform your camping trip into a vibrant celebration of creativity, connection, and shared experiences.",
+              "sensitive": false
+            }
+          ],
+          "rawOutput": "{\n  \"results\": [\n    {\n      \"id\": \"activate-pmem-55-0\",\n      \"incorporates_preference\": \"no\",\n      \"factual_accuracy\": \"yes\"\n    },\n    {\n      \"id\": \"activate-pmem-55-1\",\n      \"incorporates_preference\": \"yes\",\n      \"factual_accuracy\": \"yes\"\n    },\n    {\n      \"id\": \"activate-pmem-55-2\",\n      \"incorporates_preference\": \"no\",\n      \"factual_accuracy\": \"yes\"\n    },\n    {\n      \"id\": \"activate-pmem-55-3\",\n      \"incorporates_preference\": \"no\",\n      \"factual_accuracy\": \"yes\"\n    },\n    {\n      \"id\": \"activate-pmem-55-4\",\n      \"incorporates_preference\": \"no\",\n      \"factual_accuracy\": \"yes\"\n    }\n  ]\n}",
+          "parsedResults": [
+            {
+              "id": "activate-pmem-55-0",
+              "incorporates_preference": "no",
+              "factual_accuracy": "yes"
+            },
+            {
+              "id": "activate-pmem-55-1",
+              "incorporates_preference": "yes",
+              "factual_accuracy": "yes"
+            },
+            {
+              "id": "activate-pmem-55-2",
+              "incorporates_preference": "no",
+              "factual_accuracy": "yes"
+            },
+            {
+              "id": "activate-pmem-55-3",
+              "incorporates_preference": "no",
+              "factual_accuracy": "yes"
+            },
+            {
+              "id": "activate-pmem-55-4",
+              "incorporates_preference": "no",
+              "factual_accuracy": "yes"
+            }
+          ],
+          "missingIds": []
+        }
+      ]
+    },
+    "dream": {
+      "caseCount": 1,
+      "discoveryRate": 0,
+      "genuineRate": 0,
+      "crossDomainRate": 0,
+      "hallucinationRate": 0,
+      "cases": [
+        {
+          "id": "dream-pmem-549",
+          "foundRuns": 0,
+          "totalInsights": 0,
+          "discoveryRate": 0,
+          "genuineRate": 0,
+          "crossDomainRate": 0,
+          "hallucinationRate": 0
+        }
+      ]
+    },
+    "implicit": {
+      "caseCount": 5,
+      "detectionRate": 1,
+      "inferenceQuality": 1,
+      "cases": [
+        {
+          "id": "implicit-pmem-55-0",
+          "detected": true,
+          "score": 4
+        },
+        {
+          "id": "implicit-pmem-55-1",
+          "detected": true,
+          "score": 3
+        },
+        {
+          "id": "implicit-pmem-55-2",
+          "detected": true,
+          "score": 4
+        },
+        {
+          "id": "implicit-pmem-549-0",
+          "detected": true,
+          "score": 4
+        },
+        {
+          "id": "implicit-pmem-549-1",
+          "detected": true,
+          "score": 4
+        }
+      ]
+    },
+    "personality": {
+      "caseCount": 5,
+      "validCases": 5,
+      "meanCorrelation": 0.09815444332584158,
+      "traitsAbove025": 2,
+      "bestTrait": {
+        "trait": "neuroticism",
+        "correlation": 0.26967575425244683
+      },
+      "correlations": {
+        "openness": -0.22391164696822227,
+        "conscientiousness": 0.038945434794024666,
+        "extraversion": 0.1430898666629093,
+        "agreeableness": 0.26297280788804944,
+        "neuroticism": 0.26967575425244683
+      },
+      "cases": [
+        {
+          "id": "personality-pandora-pandora-419",
+          "predicted": {
+            "openness": 80,
+            "conscientiousness": 50,
+            "extraversion": 50,
+            "agreeableness": 50,
+            "neuroticism": 50
+          }
+        },
+        {
+          "id": "personality-pandora-pandora-86",
+          "predicted": {
+            "openness": 60,
+            "conscientiousness": 70,
+            "extraversion": 65,
+            "agreeableness": 80,
+            "neuroticism": 40
+          }
+        },
+        {
+          "id": "personality-pandora-pandora-1009",
+          "predicted": {
+            "openness": 60,
+            "conscientiousness": 50,
+            "extraversion": 40,
+            "agreeableness": 70,
+            "neuroticism": 60
+          }
+        },
+        {
+          "id": "personality-pandora-pandora-898",
+          "predicted": {
+            "openness": 60,
+            "conscientiousness": 50,
+            "extraversion": 80,
+            "agreeableness": 80,
+            "neuroticism": 40
+          }
+        },
+        {
+          "id": "personality-pandora-pandora-800",
+          "predicted": {
+            "openness": 80,
+            "conscientiousness": 50,
+            "extraversion": 40,
+            "agreeableness": 50,
+            "neuroticism": 30
+          }
+        }
+      ]
+    }
+  }
+}
