@@ -41,7 +41,7 @@ export function maximallyDistantClusters(db: KnownDB, clusterSize: number = 5): 
       category,
       nodes: getCategoryNodes(db, category, clusterSize),
     }))
-    .filter((entry) => entry.nodes.length > 0)
+    .filter((entry) => entry.nodes.length >= 3)
     .map((entry) => ({
       ...entry,
       centroid: averageEmbedding(entry.nodes),
@@ -52,7 +52,9 @@ export function maximallyDistantClusters(db: KnownDB, clusterSize: number = 5): 
     return null;
   }
 
-  let bestPair: ClusterPair | null = null;
+  // Collect all pairs sorted by distance, then pick randomly from top candidates
+  // This ensures different pairs are explored across multiple dream runs
+  const allPairs: ClusterPair[] = [];
 
   for (let i = 0; i < categories.length; i += 1) {
     for (let j = i + 1; j < categories.length; j += 1) {
@@ -60,20 +62,23 @@ export function maximallyDistantClusters(db: KnownDB, clusterSize: number = 5): 
       const right = categories[j];
       const similarity = cosineSimilarity(left.centroid, right.centroid);
       const distance = 1 - similarity;
-
-      if (!bestPair || distance > bestPair.distance) {
-        bestPair = {
-          categoryA: left.category,
-          categoryB: right.category,
-          clusterA: left.nodes,
-          clusterB: right.nodes,
-          distance,
-        };
-      }
+      allPairs.push({
+        categoryA: left.category,
+        categoryB: right.category,
+        clusterA: left.nodes,
+        clusterB: right.nodes,
+        distance,
+      });
     }
   }
 
-  return bestPair;
+  if (allPairs.length === 0) return null;
+
+  // Sort by distance descending, take top 20%, pick one randomly
+  allPairs.sort((a, b) => b.distance - a.distance);
+  const topCount = Math.max(1, Math.floor(allPairs.length * 0.2));
+  const topPairs = allPairs.slice(0, topCount);
+  return topPairs[Math.floor(Math.random() * topPairs.length)]!
 }
 
 export function randomCluster(db: KnownDB, clusterSize: number = 5): NodeRow[] {
