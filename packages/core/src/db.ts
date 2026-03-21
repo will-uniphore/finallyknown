@@ -38,6 +38,7 @@ export interface InsightRow {
   times_rediscovered: number;
   times_used: number;
   last_used: string | null;
+  initiated_at: string | null;
   embedding: Buffer | null;
 }
 
@@ -75,6 +76,7 @@ CREATE TABLE IF NOT EXISTS insights (
     times_rediscovered  INTEGER DEFAULT 0,
     times_used          INTEGER DEFAULT 0,
     last_used           TEXT,
+    initiated_at        TEXT,
     embedding           BLOB
 );
 
@@ -146,6 +148,9 @@ export class KnownDB {
   private migrate() {
     if (!hasColumn(this.db, "nodes", "times_observed")) {
       this.db.prepare("ALTER TABLE nodes ADD COLUMN times_observed REAL DEFAULT 1").run();
+    }
+    if (!hasColumn(this.db, "insights", "initiated_at")) {
+      this.db.prepare("ALTER TABLE insights ADD COLUMN initiated_at TEXT").run();
     }
 
     this.db.prepare("UPDATE nodes SET times_observed = COALESCE(times_observed, 1)").run();
@@ -519,7 +524,7 @@ export class KnownDB {
   // --- Insights ---
 
   insertInsight(
-    insight: Omit<InsightRow, "id" | "discovered_at" | "times_rediscovered" | "times_used" | "last_used"> & {
+    insight: Omit<InsightRow, "id" | "discovered_at" | "times_rediscovered" | "times_used" | "last_used" | "initiated_at"> & {
       id?: string;
     },
   ): InsightRow {
@@ -532,13 +537,14 @@ export class KnownDB {
       times_rediscovered: 0,
       times_used: 0,
       last_used: null,
+      initiated_at: null,
       embedding: insight.embedding ?? null,
     };
 
     this.db
       .prepare(
-        `INSERT INTO insights (id, text, supporting_nodes, confidence, discovered_at, times_rediscovered, times_used, last_used, embedding)
-         VALUES (@id, @text, @supporting_nodes, @confidence, @discovered_at, @times_rediscovered, @times_used, @last_used, @embedding)`,
+        `INSERT INTO insights (id, text, supporting_nodes, confidence, discovered_at, times_rediscovered, times_used, last_used, initiated_at, embedding)
+         VALUES (@id, @text, @supporting_nodes, @confidence, @discovered_at, @times_rediscovered, @times_used, @last_used, @initiated_at, @embedding)`,
       )
       .run(row);
 
@@ -587,6 +593,10 @@ export class KnownDB {
       .run(nowIso(), id);
   }
 
+  markInsightInitiated(id: string) {
+    this.db.prepare("UPDATE insights SET initiated_at = ? WHERE id = ?").run(nowIso(), id);
+  }
+
   getInsight(id: string): InsightRow | undefined {
     return this.db.prepare("SELECT * FROM insights WHERE id = ?").get(id) as InsightRow | undefined;
   }
@@ -597,6 +607,13 @@ export class KnownDB {
 
   getInsightsWithEmbeddings(): InsightRow[] {
     return this.db.prepare("SELECT * FROM insights WHERE embedding IS NOT NULL").all() as InsightRow[];
+  }
+
+  getMostRecentInsightInitiatedAt(): string | null {
+    const row = this.db.prepare("SELECT MAX(initiated_at) AS initiated_at FROM insights").get() as {
+      initiated_at: string | null;
+    };
+    return row.initiated_at ?? null;
   }
 
   getInsightsReferencingNode(nodeId: string): InsightRow[] {

@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import path from "node:path";
-import { KnownDB, discover, getConfig, ingest, maintain, think } from "known";
+import { KnownDB, discover, getConfig, getInitiationCandidate, ingest, maintain, think } from "known";
 import type { KnownConfig, NodeRow } from "known";
 
 type Logger = {
@@ -90,6 +90,8 @@ type ResolvedSettings = {
 
 const DEFAULT_DISCOVER_INTERVAL_HOURS = 4;
 const DEFAULT_MAINTAIN_INTERVAL_HOURS = 24;
+const INITIATION_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+const INITIATION_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const KNOWN_CONTEXT_PREAMBLE =
   "Known context about the user. Treat this as background guidance, not ground truth, and only use details that help with the current conversation.";
 
@@ -260,6 +262,21 @@ function buildContextInjection(text: string): string {
   return `${KNOWN_CONTEXT_PREAMBLE}\n\n${text.trim()}`;
 }
 
+function buildInitiationMessage(insightText: string): string {
+  const normalizedInsight = insightText.trim();
+  const trailingPunctuation = /[.!?]$/.test(normalizedInsight) ? "" : ".";
+  return `I've noticed something about you that I think you should know. ${normalizedInsight}${trailingPunctuation} This is something I've observed across multiple conversations. Does this resonate?`;
+}
+
+function buildInitiationInjection(message: string): string {
+  return [
+    "Known has a pending initiation for the user.",
+    "In your next response, lead with this exact message verbatim and then wait for the user's reaction before continuing:",
+    "",
+    message,
+  ].join("\n");
+}
+
 function normalizeForMatch(value: string): string {
   return value.trim().toLowerCase();
 }
@@ -317,10 +334,47 @@ async function safeMaintain(api: PluginApi, logger: Logger) {
   }
 }
 
+async function safeCheckInitiation(
+  api: PluginApi,
+  logger: Logger,
+  hasPendingInitiation: () => boolean,
+  queuePendingInitiation: (message: string) => void,
+) {
+  if (hasPendingInitiation()) {
+    return;
+  }
+
+  try {
+    await withDatabase(api, (db) => {
+      const mostRecentInitiatedAt = db.getMostRecentInsightInitiatedAt();
+      if (mostRecentInitiatedAt) {
+        const initiatedAt = new Date(mostRecentInitiatedAt);
+        if (!Number.isNaN(initiatedAt.getTime()) && Date.now() - initiatedAt.getTime() < INITIATION_COOLDOWN_MS) {
+          return;
+        }
+      }
+
+      const candidate = getInitiationCandidate(db);
+      if (!candidate) {
+        return;
+      }
+
+      const message = buildInitiationMessage(candidate.text);
+      db.markInsightInitiated(candidate.id);
+      queuePendingInitiation(message);
+      logger.info(`Known queued initiation from insight ${candidate.id}.`);
+    });
+  } catch (error) {
+    logger.error(`Known initiation check failed: ${formatError(error)}`);
+  }
+}
+
 export default function register(api: PluginApi) {
   const sessionSnapshots = new Map<string, unknown[]>();
   let discoverTimer: ReturnType<typeof setInterval> | undefined;
   let maintainTimer: ReturnType<typeof setInterval> | undefined;
+  let initiationTimer: ReturnType<typeof setInterval> | undefined;
+  let pendingInitiationMessage: string | undefined;
 
   api.on("agent_end", async (event, ctx) => {
     const payload = event as AgentEndEvent;
@@ -368,35 +422,48 @@ export default function register(api: PluginApi) {
     const payload = event as BeforePromptBuildEvent;
     const settings = resolveSettings(api);
     const prompt = payload.prompt?.trim();
+    const prependContexts: string[] = [];
 
-    if (!settings.autoContext || !prompt) {
+    if (pendingInitiationMessage) {
+      prependContexts.push(buildInitiationInjection(pendingInitiationMessage));
+      pendingInitiationMessage = undefined;
+    }
+
+    if (settings.autoContext && prompt) {
+      try {
+        const contextInjection = await withDatabase(api, async (db, activeSettings) => {
+          if (db.getStats().nodeCount === 0) {
+            return null;
+          }
+
+          const result = await think(
+            db,
+            buildContextQuestion(prompt),
+            activeSettings.knownConfig,
+            "Respond with compact agent-facing context that is directly useful for the current conversation."
+          );
+
+          const response = result.response.trim();
+          if (!response || response === "Unable to reason about this question.") {
+            return null;
+          }
+
+          return buildContextInjection(response);
+        });
+
+        if (contextInjection) {
+          prependContexts.push(contextInjection);
+        }
+      } catch (error) {
+        api.logger.error(`Known auto-context failed: ${formatError(error)}`);
+      }
+    }
+
+    if (prependContexts.length === 0) {
       return;
     }
 
-    try {
-      return await withDatabase(api, async (db, activeSettings) => {
-        if (db.getStats().nodeCount === 0) {
-          return;
-        }
-
-        const result = await think(
-          db,
-          buildContextQuestion(prompt),
-          activeSettings.knownConfig,
-          "Respond with compact agent-facing context that is directly useful for the current conversation."
-        );
-
-        const response = result.response.trim();
-        if (!response || response === "Unable to reason about this question.") {
-          return;
-        }
-
-        return { prependSystemContext: buildContextInjection(response) };
-      });
-    } catch (error) {
-      api.logger.error(`Known auto-context failed: ${formatError(error)}`);
-      return;
-    }
+    return { prependSystemContext: prependContexts.join("\n\n") };
   });
 
   api.registerTool({
@@ -501,6 +568,26 @@ export default function register(api: PluginApi) {
     start(ctx) {
       const settings = resolveSettings(api);
 
+      void safeCheckInitiation(
+        api,
+        ctx.logger,
+        () => Boolean(pendingInitiationMessage),
+        (message) => {
+          pendingInitiationMessage = message;
+        },
+      );
+      initiationTimer = setInterval(() => {
+        void safeCheckInitiation(
+          api,
+          ctx.logger,
+          () => Boolean(pendingInitiationMessage),
+          (message) => {
+            pendingInitiationMessage = message;
+          },
+        );
+      }, INITIATION_CHECK_INTERVAL_MS);
+      initiationTimer.unref?.();
+
       if (settings.discoverIntervalMs > 0) {
         discoverTimer = setInterval(() => {
           void safeDiscover(api, ctx.logger);
@@ -516,10 +603,15 @@ export default function register(api: PluginApi) {
       }
 
       ctx.logger.info(
-        `Known thinker started (discover every ${settings.discoverIntervalMs / 3600000}h, maintain every ${settings.maintainIntervalMs / 3600000}h).`,
+        `Known thinker started (discover every ${settings.discoverIntervalMs / 3600000}h, maintain every ${settings.maintainIntervalMs / 3600000}h, initiation checks every ${INITIATION_CHECK_INTERVAL_MS / 3600000}h).`,
       );
     },
     stop(ctx) {
+      if (initiationTimer) {
+        clearInterval(initiationTimer);
+        initiationTimer = undefined;
+      }
+
       if (discoverTimer) {
         clearInterval(discoverTimer);
         discoverTimer = undefined;

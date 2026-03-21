@@ -1,6 +1,8 @@
 #!/usr/bin/env node
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
+import { dirname, resolve } from "path";
 import { stdin as input } from "process";
+import { fileURLToPath, pathToFileURL } from "url";
 import { getConfig } from "./config.js";
 import { KnownDB } from "./db.js";
 import { discover } from "./discover.js";
@@ -19,6 +21,7 @@ function usage() {
   known query "<question>" [--context "<agent context>"]
   known discover
   known maintain
+  known serve [--port 3456]
   known eval [--golden eval/golden-eval.json] [--test encode|activate|dream|implicit|personality|all] [--limit N]
   known benchmark [--test 1a|2a|3a|4a|all] [--personas 5] [--pandora-users 20]
   known stats`);
@@ -47,6 +50,42 @@ async function readStdin(): Promise<string> {
   return chunks.join("").trim();
 }
 
+function moduleDir() {
+  return dirname(fileURLToPath(import.meta.url));
+}
+
+function parsePort(value: string | undefined): number | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const port = Number.parseInt(value, 10);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid port: ${value}`);
+  }
+
+  return port;
+}
+
+async function runApiServerCli(port?: number) {
+  const candidates = [
+    resolve(moduleDir(), "..", "..", "server", "dist", "index.js"),
+    resolve(process.cwd(), "packages", "server", "dist", "index.js"),
+  ];
+  const entryPath = candidates.find((candidate) => existsSync(candidate));
+
+  if (!entryPath) {
+    throw new Error("Known API server is not built. Run `pnpm build` first.");
+  }
+
+  const mod = await import(pathToFileURL(entryPath).href);
+  if (typeof mod.startServer !== "function") {
+    throw new Error(`Known API server entry is missing startServer(): ${entryPath}`);
+  }
+
+  await mod.startServer({ port });
+}
+
 async function main() {
   const [, , command, ...rawArgs] = process.argv;
   if (!command) {
@@ -54,12 +93,12 @@ async function main() {
     process.exit(0);
   }
 
-  const config = getConfig();
   let db: KnownDB | null = null;
 
   try {
     switch (command) {
       case "ingest": {
+        const config = getConfig();
         db = new KnownDB(config.dbPath);
         const sessionFlag = parseFlag(rawArgs, "--session");
         const textFlag = parseFlag(sessionFlag.rest, "--text");
@@ -78,6 +117,7 @@ async function main() {
       }
 
       case "query": {
+        const config = getConfig();
         db = new KnownDB(config.dbPath);
         const contextFlag = parseFlag(rawArgs, "--context");
         const question = contextFlag.rest.join(" ").trim();
@@ -94,6 +134,7 @@ async function main() {
       }
 
       case "discover": {
+        const config = getConfig();
         db = new KnownDB(config.dbPath);
         const result = await discover(db, config);
         if (!result.found) {
@@ -107,12 +148,24 @@ async function main() {
       }
 
       case "maintain": {
+        const config = getConfig();
         db = new KnownDB(config.dbPath);
         const result = maintain(db, config);
         console.log(`Nodes decayed: ${result.nodesDecayed}`);
         console.log(`Nodes pruned: ${result.nodesPruned}`);
         console.log(`Insights pruned: ${result.insightsPruned}`);
         console.log(`Nodes merged: ${result.nodesMerged}`);
+        break;
+      }
+
+      case "serve": {
+        const portFlag = parseFlag(rawArgs, "--port");
+        if (portFlag.rest.length > 0) {
+          console.error("Usage error: known serve [--port 3456]");
+          process.exit(1);
+        }
+
+        await runApiServerCli(parsePort(portFlag.value));
         break;
       }
 
@@ -127,7 +180,7 @@ async function main() {
       }
 
       case "stats": {
-        db = new KnownDB(config.dbPath);
+        db = new KnownDB(getConfig().dbPath);
         const stats = db.getStats();
         console.log(`Nodes: ${stats.nodeCount}`);
         console.log(`Edges: ${stats.edgeCount}`);

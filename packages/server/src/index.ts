@@ -1,19 +1,25 @@
+import dotenv from "dotenv";
 import { serve } from "@hono/node-server";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { Hono } from "hono";
 import { pathToFileURL } from "url";
-import { discover, getConfig, ingest, KnownDB, maintain, think } from "known";
+import { discover, getConfig, ingest, KnownDB, think } from "known";
+
+dotenv.config({ path: join(homedir(), ".known", ".env") });
 
 export function createApp(db: KnownDB, config = getConfig()) {
   const app = new Hono();
 
   app.post("/ingest", async (c) => {
     try {
-      const body = await c.req.json<{ sessionText?: string; sessionId?: string }>();
-      if (!body.sessionText?.trim()) {
-        return c.json({ error: "sessionText is required" }, 400);
+      const body = await c.req.json<{ text?: string; sessionText?: string; sessionId?: string }>();
+      const text = body.text?.trim() ?? body.sessionText?.trim();
+      if (!text) {
+        return c.json({ error: "text is required" }, 400);
       }
 
-      return c.json(await ingest(db, body.sessionText, config, body.sessionId));
+      return c.json(await ingest(db, text, config, body.sessionId));
     } catch (error) {
       return c.json({ error: error instanceof Error ? error.message : "Unknown error" }, 500);
     }
@@ -40,14 +46,6 @@ export function createApp(db: KnownDB, config = getConfig()) {
     }
   });
 
-  app.post("/maintain", (c) => {
-    try {
-      return c.json(maintain(db, config));
-    } catch (error) {
-      return c.json({ error: error instanceof Error ? error.message : "Unknown error" }, 500);
-    }
-  });
-
   app.get("/stats", (c) => {
     try {
       return c.json(db.getStats());
@@ -59,14 +57,14 @@ export function createApp(db: KnownDB, config = getConfig()) {
   return app;
 }
 
-export function startServer() {
+export function startServer(options: { port?: number } = {}) {
   const config = getConfig();
   const db = new KnownDB(config.dbPath);
   const app = createApp(db, config);
-  const port = Number.parseInt(process.env.KNOWN_PORT ?? "7777", 10);
+  const port = options.port ?? Number.parseInt(process.env.KNOWN_PORT ?? "3456", 10);
 
   const server = serve({ fetch: app.fetch, port }, () => {
-    console.log(`Known brain listening at http://localhost:${port}`);
+    console.log(`Known API running on http://localhost:${port}`);
   });
 
   const shutdown = () => {

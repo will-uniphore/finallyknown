@@ -2,6 +2,8 @@ import type { KnownConfig } from "./config.js";
 import type { InsightRow, KnownDB } from "./db.js";
 import { generateEmbedding, semanticSearch } from "./embeddings.js";
 
+export type Insight = InsightRow;
+
 export interface StoreOrStrengthenInsightResult {
   created: boolean;
   strengthened: boolean;
@@ -10,6 +12,29 @@ export interface StoreOrStrengthenInsightResult {
 
 export function shouldSurfaceInsight(insight: Pick<InsightRow, "times_rediscovered" | "confidence">): boolean {
   return insight.times_rediscovered >= 2 && insight.confidence >= 0.6;
+}
+
+export function getInitiationCandidate(db: KnownDB): Insight | null {
+  return (
+    db
+      .getAllInsights()
+      .filter(
+        (insight) =>
+          insight.confidence >= 0.7 &&
+          insight.times_rediscovered >= 2 &&
+          insight.times_used === 0 &&
+          !insight.initiated_at,
+      )
+      .sort((left, right) => {
+        if (right.confidence !== left.confidence) {
+          return right.confidence - left.confidence;
+        }
+        if (right.times_rediscovered !== left.times_rediscovered) {
+          return right.times_rediscovered - left.times_rediscovered;
+        }
+        return left.discovered_at.localeCompare(right.discovered_at);
+      })[0] ?? null
+  );
 }
 
 export async function storeOrStrengthenInsight(

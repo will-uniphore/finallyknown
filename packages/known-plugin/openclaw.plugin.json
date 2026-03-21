@@ -2,7 +2,6 @@
   "id": "known",
   "name": "Known",
   "description": "Known memory plugin for OpenClaw.",
-  "kind": "memory",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,

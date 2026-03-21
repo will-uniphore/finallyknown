@@ -1,5 +1,5 @@
 {
-  "name": "@known/plugin",
+  "name": "@known/known",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
@@ -18,10 +18,5 @@
   "devDependencies": {
     "tsup": "^8.4.0",
     "typescript": "^5.7.0"
-  },
-  "openclaw": {
-    "extensions": [
-      "./dist/index.js"
-    ]
   }
 }

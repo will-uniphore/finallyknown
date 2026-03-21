@@ -47,7 +47,7 @@ importers:
         specifier: ^3.1.0
         version: 3.2.4(@types/node@25.5.0)
 
-  packages/plugin:
+  packages/known-plugin:
     dependencies:
       known:
         specifier: workspace:*
@@ -65,6 +65,9 @@ importers:
       '@hono/node-server':
         specifier: ^1.14.0
         version: 1.19.11(hono@4.12.8)
+      dotenv:
+        specifier: ^16.4.7
+        version: 16.6.1
       hono:
         specifier: ^4.7.0
         version: 4.12.8
